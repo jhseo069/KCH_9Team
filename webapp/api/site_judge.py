@@ -18,15 +18,30 @@ from urllib.parse import parse_qs, urlparse
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.normpath(os.path.join(HERE, "..", ".."))
 SRC_DIR = os.path.join(BASE_DIR, "src")
-sys.path.insert(0, SRC_DIR)
+DATA_DIR = os.path.join(BASE_DIR, "data")
+RULE_TABLE_PATH = os.path.join(DATA_DIR, "rule_table.csv")
 
-import pandas as pd  # noqa: E402
-from export_output import generate_output_table  # noqa: E402
-from judge import judge  # noqa: E402
-from match_regulations import match_regulations  # noqa: E402
-from query_site_data import query_site  # noqa: E402
-
-RULE_TABLE_PATH = os.path.join(BASE_DIR, "data", "rule_table.csv")
+# 모듈 최상단 import가 실패하면(Vercel Root Directory 경계 등으로 src/data를 못 찾는 경우)
+# Vercel이 FUNCTION_INVOCATION_FAILED만 보여주고 원인을 알려주지 않으므로,
+# 직접 진단 정보를 만들어서 요청이 왔을 때 그대로 돌려준다.
+IMPORT_ERROR = None
+try:
+    sys.path.insert(0, SRC_DIR)
+    import pandas as pd  # noqa: E402
+    from export_output import generate_output_table  # noqa: E402
+    from judge import judge  # noqa: E402
+    from match_regulations import match_regulations  # noqa: E402
+    from query_site_data import query_site  # noqa: E402
+except Exception as e:
+    IMPORT_ERROR = {
+        "type": f"{type(e).__name__}: {e}",
+        "here": HERE,
+        "base_dir": BASE_DIR,
+        "src_dir": SRC_DIR,
+        "src_dir_exists": os.path.isdir(SRC_DIR),
+        "data_dir_exists": os.path.isdir(DATA_DIR),
+        "rule_table_exists": os.path.isfile(RULE_TABLE_PATH),
+    }
 
 
 def run_pipeline(address: str, project_type: str, capacity_kw: float) -> dict:
@@ -61,6 +76,10 @@ class handler(BaseHTTPRequestHandler):
             capacity_kw = float((query.get("capacity_kw") or ["0"])[0])
         except ValueError:
             capacity_kw = 0.0
+
+        if IMPORT_ERROR is not None:
+            self._send_json({"error": "import_failed", "detail": IMPORT_ERROR}, status=500)
+            return
 
         if not address:
             self._send_json({"error": "address 파라미터가 필요합니다"}, status=400)
