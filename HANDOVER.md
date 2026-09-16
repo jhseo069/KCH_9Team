@@ -66,6 +66,27 @@ python src/run_summary.py                                     # [8] 이번 실�
 
 **추가 발견(2026-09-16, 같은 날 오후):** API 신청·대기 없이도 **CSV/XLSX는 "정보 활용 목적"만 선택하면 즉시 다운로드된다** (승인 절차 없음). 실제로 "토지이용규제 행위제한정보" 최신본(전국, 매월 갱신, ~55MB)을 받아서 열어봤는데, 용도지역지구명 × 시설유형(발전소로 사용되는 건축물/태양광 및 풍력 발전시설 등) → 건축가능여부 + 조건이 이미 분석되어 있었다. `rule_table.csv`의 R004·R005·R006(발전시설 관련 용도지역 규칙)을 이 자료로 보정 완료(§PRD.md FR-3 참고). `조례_전남` 시트는 46만 행으로 목포시(시군구코드 12110) 등 개별 지자체 조례까지 포함하므로, 지역별 규칙표 정밀화가 필요할 때 다시 활용할 수 있다. 다운로드 방법은 `svItemDet.jsp`(dataCd/dataTypeCd로 조회) → `svItemAjaxXml.jsp`(selectFileInfo → insertStatInfo) → `map.eum.go.kr:8002/OpenData/opDownloader.jsp`(key+filename) 순서다.
 
+## 5-2. GIS 좌표 기반 용도지역 자동 판별로 전환 (2026-09-16)
+
+토지이음 개별 주소 조회(§4)가 클라우드에서 막혀있는 문제를, **eum.go.kr 공식 SHP 데이터 + GIS 폴리곤 매칭**으로 우회했다. 브이월드 GetFeature/WFS와 공공데이터포털의 관련 API도 모두 시도했으나(추가 승인 필요 또는 애초에 좌표 입력을 지원하지 않음) 막혀서, 최종적으로는 데이터를 직접 받아 로컬(웹앱 배포본에 포함)에서 계산하는 방식으로 확정했다.
+
+**데이터 출처**: eum.go.kr 데이터개방 > "(도시계획)용도지역정보"(dataCd=004) > SHP > 전국 zip(976MB, fileId는 갱신 시마다 바뀜) 안에 시도별로 쪼개진 zip이 들어있음(`KLIP_004_20260801_12000.zip` = 전남·광주 통합, 117MB). 그 안의 `KLIP_C_UQ111.shp`가 용도지역(4대 대분류 + 세분류) 폴리곤이다.
+
+**다운로드 절차** (매뉴얼/실측으로 확인한 실제 AJAX 흐름, `svItemDet.js` 참고):
+1. `POST svItemAjaxXml.jsp` `function=selectFileInfo&dataCd=004&dataTypeCd=SHP&fileId=<파일목록에서 확인>` → `key`, `fileNm` 획득
+2. `POST svItemAjaxXml.jsp` `function=insertStatInfo&dataCd=004&dataTypeCd=SHP&useType=1&useDesc=<용도설명>` (이용목적 등록, 승인절차 없음)
+3. `GET https://map.eum.go.kr:8002/OpenData/opDownloader.jsp?key=<1의 key>&filename=<1의 fileNm>` → zip 다운로드
+
+**좌표계 주의**: .prj를 실제로 열어보면 `Korean 1985 / Modified Central Belt`인데, 표준 EPSG:5186(false_northing=600000)이 아니라 **EPSG:5174(false_northing=500000)**다. 5186으로 잘못 변환하면 좌표가 엉뚱한 곳(제주 남쪽 해상 등)으로 튄다.
+
+**전남 22개 시군구코드**: 이 데이터는 "전남광주통합특별시"(sido 12)로 광주까지 합쳐서 제공된다. 시군구코드(`sgg_cd`)가 실제 어느 시/군인지는 공식 코드-지명 대응표가 없어서, 각 코드의 대표 폴리곤 중심점을 브이월드 역지오코딩(`service=address&request=getAddress`)으로 조회해서 직접 확인했다(`data/zoning_jeonnam.geojson` 생성 스크립트인 `scripts/build_zoning_geojson.py`에 결과 반영됨). 완도군(12850)만 다도해라 중심점이 바다에 걸려 역지오코딩이 실패했는데, 전남 22개 시군구 중 유일하게 안 맞춰진 코드라 소거법으로 확정함.
+
+**용도지역 코드 → 한글명**: eum.go.kr 다운로드 페이지의 "매뉴얼" 링크(`manualDownload.jsp?fileNm=004-SHP.zip`)에서 받은 `24-1010_토지이음개방용 KLIP 테이블 목록 및 정의서.xlsx`의 "속성테이블 설계" 시트에 공식 코드표가 있다(UQA121=제1종일반주거지역, UQB100=계획관리지역 등).
+
+**결과물**: `data/zoning_jeonnam.geojson`(전남 22개 시군구, 4,426개 폴리곤, WGS84, 좌표 소수점 6자리로 반올림해 18.6MB), `src/gis_lookup.py`의 `find_zone_by_coordinate(lon, lat)`. 좌표가 폴리곤 0개 또는 2개 이상(오래된 중복 데이터)과 겹치면 값을 추측하지 않고 항상 `status="no_match"`/`"ambiguous"`로 사람 확인을 요구한다(judge.py와 동일한 안전 원칙).
+
+**남은 일**: 아직 `query_site_data.py`의 [2]단계 파이프라인에 연결하지 않았다 — 지금은 `find_zone_by_coordinate` 단독 함수만 있고, 브이월드 지오코딩 결과(좌표) → 이 함수 → `match_regulations.py`가 기대하는 형식으로 잇는 통합 작업이 남아있다. UQ111(용도지역) 레이어만 사용 중이며, UQ112(용도지구)·UQ113(용도구역) 등은 아직 반영 안 함.
+
 ## 5. 알려진 한계 (2026-09-16 기준)
 
 - 브이월드 지적·토지특성정보 API(GetFeature/NED)는 별도 활용신청 미승인 상태 — 지목·면적은 토지이음 응답으로 대체 확보 중
