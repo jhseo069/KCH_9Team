@@ -47,12 +47,18 @@ def vworld_geocode(address: str) -> dict:
         "format": "json",
         "key": VWORLD_API_KEY,
     }
+    last_error = None
     for addr_type in ("road", "parcel"):
         try:
             res = requests.get(url, params={**base_params, "type": addr_type}, timeout=10)
+        except Exception as e:
+            last_error = f"요청 실패: {e}"
+            continue
+        try:
             data = res.json()
         except Exception as e:
-            return {"status": "no_data", "reason": f"요청 실패: {e}"}
+            last_error = f"응답 파싱 실패(status={res.status_code}): {e} / body_preview={res.text[:200]!r}"
+            continue
 
         status = data.get("response", {}).get("status")
         if status == "OK":
@@ -65,6 +71,8 @@ def vworld_geocode(address: str) -> dict:
                 "refined_addr": data["response"]["refined"]["text"],
             }
 
+    if last_error is not None:
+        return {"status": "no_data", "reason": last_error}
     return {"status": "no_data", "reason": f"주소를 찾을 수 없습니다 ({status})"}
 
 
