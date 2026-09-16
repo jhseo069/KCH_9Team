@@ -39,6 +39,7 @@ python src/run_summary.py                                     # [8] 이번 실�
 |---|---|---|
 | `query_site_data.py` 실행 시 `eum.status: no_data`, 사유 "빈 응답" | 토지이음(eum.go.kr) 요청 빈도 제한 또는 서버측 차단 | **2026-09-16 기준 1주일이 지나도 안 풀리는 것을 확인함** — 단순 대기로 해결 안 될 수 있음. 다른 네트워크(자택/모바일 핫스팟 등)에서 재시도해보고, 그래도 안 되면 토지이음 담당(헬프데스크 02-838-4405) 문의 고려 |
 | `vworld.status: no_data` | 브이월드 지오코더 주소 인식 실패 또는 API 키 문제 | 주소 표기를 도로명/지번 다른 형식으로 재시도. API 키 만료 여부는 `.env`의 `VWORLD_API_KEY` 확인 |
+| **웹앱(Vercel)에서만** `vworld.status: no_data`, 사유가 "요청 실패: Connection aborted" 또는 "응답 파싱 실패(status=502)" | 브이월드 지오코더가 Vercel 트래픽을 차단/불안정 처리하는 것으로 추정(§5-4) — 이 dev 환경/로컬에서는 정상 동작 | **2026-09-16 기준 재시도 로직을 넣어도 안 풀림** — 미해결 상태. §5-4 참고 |
 | `check_law_updates.py`에서 `lookup_failed` 다수 발생 | law.go.kr 접근 제한 또는 `OC=test` 데모 접근이 막힘 | `open.law.go.kr`에서 본인 이메일로 무료 OC 등록 후 `.env`에 `LAW_GO_KR_OC=<발급받은 OC>` 추가 |
 | 판정표에 예상보다 "판정불가"가 많음 | 정상 동작(안전장치) — 규칙표에 없는 신규 표기이거나 매칭이 모호한 경우 의도적으로 판정불가 처리됨 | `output/human_review_needed.csv` 확인 후, 반복되는 항목이면 규칙표에 새 규칙 추가 |
 
@@ -85,7 +86,7 @@ python src/run_summary.py                                     # [8] 이번 실�
 
 **결과물**: `data/zoning_jeonnam.geojson`(전남 22개 시군구, 4,426개 폴리곤, WGS84, 좌표 소수점 6자리로 반올림해 18.6MB), `src/gis_lookup.py`의 `find_zone_by_coordinate(lon, lat)`. 좌표가 폴리곤 0개 또는 2개 이상(오래된 중복 데이터)과 겹치면 값을 추측하지 않고 항상 `status="no_match"`/`"ambiguous"`로 사람 확인을 요구한다(judge.py와 동일한 안전 원칙).
 
-**남은 일**: 아직 `query_site_data.py`의 [2]단계 파이프라인에 연결하지 않았다 — 지금은 `find_zone_by_coordinate` 단독 함수만 있고, 브이월드 지오코딩 결과(좌표) → 이 함수 → `match_regulations.py`가 기대하는 형식으로 잇는 통합 작업이 남아있다. UQ111(용도지역) 레이어만 사용 중이며, UQ112(용도지구)·UQ113(용도구역) 등은 아직 반영 안 함.
+**남은 일**: `query_site_data.py`의 `resolve_zone_info()`로 [2]단계 파이프라인에 연결 완료(eum.go.kr 실패 시 자동 대체). 다만 §5-4에 적은 대로 브이월드 지오코딩 자체가 Vercel에서 막혀 있어 웹앱에서는 아직 실사용이 안 된다. UQ111(용도지역) 레이어만 사용 중이며, UQ112(용도지구)·UQ113(용도구역) 등은 아직 반영 안 함.
 
 ## 5-3. 웹앱(Vercel) 구조: webapp/ 하위폴더 → 프로젝트 루트로 이동 (2026-09-16)
 
@@ -94,6 +95,16 @@ python src/run_summary.py                                     # [8] 이번 실�
 **따라서 Vercel 프로젝트 설정에서 Root Directory를 빈 값(저장소 루트 그대로)으로 바꿔야 한다** — 예전에 이 문서에 적혀 있던 "Root Directory를 `나만의 AI Agent 개발/부지판정자동화/webapp`으로 설정"이라는 안내는 애초에 잘못됐다: 실제 GitHub 저장소(jhseo069/KCH_9Team)의 루트가 이미 이 `부지판정자동화` 폴더 자체이고(로컬 디스크 경로일 뿐, 저장소 안에는 `나만의 AI Agent 개발`이라는 폴더가 없음), `webapp`도 이제 없어졌으므로 두 세그먼트 다 빼야 한다.
 
 또 하나 실측으로 확인한 이 Vercel Python 런타임의 제약: `api/`에 handler 파일이 여러 개 있으면 **자동으로 파일마다 라우팅해주지 않고**, `pyproject.toml`의 `[tool.vercel] entrypoint`로 정확히 하나를 명시해야 한다(빌드 로그: `Error: No python entrypoint found in default locations, but found potential entrypoints: ...`). 그래서 서버리스 함수는 `api/site_judge.py` 하나만 유지한다(§api/README.md 참고).
+
+## 5-4. 새로운 차단 확인: 브이월드 지오코더도 Vercel에서 막힘 (2026-09-16)
+
+`api/`, `src/`, `data/` 경로 문제를 다 해결하고 실제로 웹앱에서 주소를 입력해보니, 이번엔 **브이월드 지오코더 API(`api.vworld.kr`, 주소→좌표 변환)가 Vercel(icn1, 서울 리전)에서 호출될 때마다 실패**하는 걸 확인했다 — 이 Claude 개발환경에서 호출하면 항상 정상 동작하는 바로 그 주소/키로도, Vercel에서는:
+- 어떤 때는 연결이 중간에 끊김(`RemoteDisconnected: Remote end closed connection without response`)
+- 어떤 때는 `502 Bad Gateway` (브이월드 서버가 빈 응답)
+
+`vworld_geocode()`에 네트워크 오류 시 짧게 재시도하는 로직을 추가해서(방식별 최대 2회, `src/query_site_data.py`) 배포 후 4연속 테스트했지만 **매번 다른 방식으로 계속 실패** — 일시적 속도제한이 아니라 지속적인 차단으로 판단된다. eum.go.kr의 개별 조회 차단(§4)과 같은 패턴(클라우드/서버리스 트래픽에 대한 차단으로 추정)이지만, 이번엔 이미 만들어둔 GIS 용도지역 조회(§5-2)가 애초에 입력으로 필요로 하는 "주소→좌표 변환" 그 자체가 막힌 것이라 GIS 우회로도 해결이 안 된다.
+
+**현재 상태**: 웹앱(`api/site_judge.py`)은 배포되어 정상적으로 실행되지만, 좌표를 못 구해서 사실상 모든 주소 조회가 실패한다. **다음에 이어서 풀어야 할 문제**: 좌표 변환을 브이월드가 아닌 다른 경로로 하거나(예: 브이월드도 eum.go.kr처럼 공식 대용량 데이터 다운로드 경로가 있는지 확인), 이 프로젝트 개발환경(또는 사용자 로컬)에서 좌표만 미리 계산해서 넘기는 방식 등을 검토할 것.
 
 ## 5. 알려진 한계 (2026-09-16 기준)
 
