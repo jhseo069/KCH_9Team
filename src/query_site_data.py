@@ -19,6 +19,8 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+from gis_lookup import find_zone_by_coordinate
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
@@ -157,6 +159,36 @@ def eum_get_land_detail(pnu: str, session: requests.Session) -> dict:
     }
 
 
+def resolve_zone_info(vworld_result: dict, eum_result: dict, geojson_path=None) -> dict:
+    """토지이음(eum) 개별조회가 실패했을 때, 브이월드 좌표로 GIS 용도지역 조회(전남만 가능)를
+    대신 시도한다. eum이 이미 성공했으면 그대로 두고(더 상세한 지목·면적 정보를 갖고 있으므로),
+    GIS도 실패하면(좌표 없음/매칭 0건/매칭 2건 이상) eum의 원래 실패 사유를 그대로 사람에게 남긴다."""
+    if eum_result.get("status") == "ok":
+        return eum_result
+    if vworld_result.get("status") != "ok":
+        return eum_result
+
+    kwargs = {"geojson_path": geojson_path} if geojson_path is not None else {}
+    zone_result = find_zone_by_coordinate(vworld_result["lon"], vworld_result["lat"], **kwargs)
+
+    if zone_result["status"] != "ok":
+        return {
+            **eum_result,
+            "reason": f"{eum_result.get('reason', '')} / GIS 대체 조회도 실패: {zone_result.get('reason', zone_result['status'])}",
+        }
+
+    return {
+        "status": "ok",
+        "source": "gis",
+        "jimok_code": None,
+        "area_sqm": None,
+        "zone_national_law": [zone_result["zone_name"]],
+        "zone_other_law": [],
+        "special_notice_raw": "",
+        "sgg_nm": zone_result["sgg_nm"],
+    }
+
+
 def query_site(address_or_jibun: str, project_type: str, target_capacity_kw: float) -> dict:
     """[1]입력 -> [2]데이터 조회 전체 흐름 실행. raw_query_result 구조를 그대로 반환."""
     result = {
@@ -174,13 +206,13 @@ def query_site(address_or_jibun: str, project_type: str, target_capacity_kw: flo
 
     pnu_result = eum_resolve_pnu(address_or_jibun, session)
     if pnu_result["status"] != "ok":
-        result["eum"] = pnu_result
+        result["eum"] = resolve_zone_info(result["vworld"], pnu_result)
         return result
 
     time.sleep(0.3)  # 연속 요청 간 최소 대기
     detail = eum_get_land_detail(pnu_result["pnu"], session)
     detail["candidates"] = pnu_result.get("candidates")
-    result["eum"] = detail
+    result["eum"] = resolve_zone_info(result["vworld"], detail)
     return result
 
 

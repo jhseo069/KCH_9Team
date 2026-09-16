@@ -134,8 +134,10 @@ def main():
         atrb = rec[idx_atrb] or rec[idx_lclas] or ""
         zone_name = ZONE_CODE_NAME.get(atrb)
         if zone_name is None:
+            # 공식 코드표에 없는 코드(오타 등 원본 데이터 오류로 추정)는 통째로 제외한다.
+            # 포함시키면 정상 폴리곤과 좌표가 겹쳐서 애매한 매칭(사람 확인 필요)만 늘어난다.
             skipped_unknown_code.add(atrb)
-            zone_name = atrb
+            continue
 
         for p in shape_to_polygons(shp):
             if p.is_empty:
