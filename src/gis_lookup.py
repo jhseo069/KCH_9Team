@@ -36,21 +36,22 @@ def find_zone_by_coordinate(lon: float, lat: float, geojson_path: Path = DEFAULT
     for feature in fc["features"]:
         geom = shape(feature["geometry"])
         if geom.intersects(point):
-            matches.append(feature["properties"])
+            matches.append(feature)
 
     if len(matches) == 1:
-        props = matches[0]
+        props = matches[0]["properties"]
         return {
             "status": "ok",
             "zone_name": props["zone_name"],
             "zone_code": props["zone_code"],
             "sgg_nm": props["sgg_nm"],
             "sgg_cd": props["sgg_cd"],
+            "geometry": matches[0]["geometry"],
         }
     if len(matches) == 0:
         return {"status": "no_match", "reason": "해당 좌표를 포함하는 용도지역 폴리곤이 없음"}
     return {
         "status": "ambiguous",
-        "candidates": matches,
+        "candidates": [m["properties"] for m in matches],
         "reason": f"{len(matches)}개 폴리곤이 겹침 (오래된 중복 데이터 가능성) - 사람 확인 필요",
     }

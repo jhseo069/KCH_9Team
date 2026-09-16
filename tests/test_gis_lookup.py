@@ -17,6 +17,13 @@ def test_point_inside_single_polygon_returns_ok():
     assert result["sgg_nm"] == "목포시"
 
 
+def test_point_inside_single_polygon_returns_geometry_for_map_display():
+    result = find_zone_by_coordinate(0.5, 0.5, geojson_path=FIXTURE)
+
+    assert result["geometry"]["type"] == "Polygon"
+    assert result["geometry"]["coordinates"] == [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
+
+
 def test_point_outside_all_polygons_returns_no_match():
     result = find_zone_by_coordinate(50.0, 50.0, geojson_path=FIXTURE)
 

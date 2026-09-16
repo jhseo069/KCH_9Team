@@ -53,6 +53,9 @@ def run_pipeline(address: str, project_type: str, capacity_kw: float) -> dict:
         "vworld": raw["vworld"],
         "eum": eum_result,
         "table": [],
+        # 지도 위성 타일 표시용(브이월드 WMTS) - 이 키로는 지도 타일만 그리고,
+        # CORS로 막혀있는 지오코더 API는 여전히 서버(이 함수)에서만 호출한다.
+        "vworld_map_key": os.environ.get("VWORLD_API_KEY", ""),
     }
 
     if eum_result.get("status") != "ok":

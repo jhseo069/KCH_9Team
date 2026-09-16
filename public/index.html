@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>사업 분석자동화</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root{ --bg:#f6f7f9; --card:#fff; --ink:#1b2030; --muted:#5b6472; --line:#e6e8ee; --accent:#3f5bd9; }
   *{box-sizing:border-box}
@@ -30,6 +31,8 @@
   .note{background:#fef4ec;border:1px solid #e2a06a;border-radius:10px;padding:14px 16px;font-size:14.5px;margin-top:8px}
   .foot{margin-top:8px;font-size:13px;color:var(--muted)}
   a{color:var(--accent)}
+  #map{width:100%;height:340px;border-radius:10px;margin-bottom:14px;background:#e9ebef}
+  .leaflet-container{border-radius:10px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -62,6 +65,7 @@
   </section>
 
   <section class="card" id="result-card" hidden>
+    <div id="map" hidden></div>
     <div id="result-meta" class="foot"></div>
     <div id="result-body"></div>
   </section>
@@ -70,6 +74,7 @@
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
   const formEl = document.getElementById("judge-form");
   const msgEl = document.getElementById("form-msg");
@@ -77,6 +82,12 @@
   const resultCard = document.getElementById("result-card");
   const resultMeta = document.getElementById("result-meta");
   const resultBody = document.getElementById("result-body");
+  const mapEl = document.getElementById("map");
+
+  let leafletMap = null;
+  let mapMarkerLayer = null;
+  let mapZoneLayer = null;
+  let mapTileLayer = null;
 
   formEl.addEventListener("submit", async function (event) {
     event.preventDefault();
@@ -108,8 +119,51 @@
     }
   });
 
+  function renderMap(data) {
+    const v = data.vworld;
+    if (!v || v.status !== "ok") {
+      mapEl.hidden = true;
+      return;
+    }
+    mapEl.hidden = false;
+
+    if (!leafletMap) {
+      leafletMap = L.map(mapEl, { attributionControl: false });
+      L.control.attribution({ prefix: false }).addTo(leafletMap).addAttribution("© VWorld, 국토교통부");
+    }
+    // Leaflet 컨테이너 크기가 hidden 상태에서 바뀌었을 수 있으니 다시 계산
+    setTimeout(function () { leafletMap.invalidateSize(); }, 0);
+
+    const key = data.vworld_map_key;
+    if (key && !mapTileLayer) {
+      mapTileLayer = L.tileLayer(
+        "https://api.vworld.kr/req/wmts/1.0.0/" + key + "/Satellite/{z}/{y}/{x}.jpeg",
+        { maxZoom: 19, tileSize: 256 }
+      ).addTo(leafletMap);
+    }
+
+    const latlng = [v.lat, v.lon];
+    leafletMap.setView(latlng, 18);
+
+    if (mapMarkerLayer) leafletMap.removeLayer(mapMarkerLayer);
+    mapMarkerLayer = L.marker(latlng).addTo(leafletMap);
+
+    if (mapZoneLayer) {
+      leafletMap.removeLayer(mapZoneLayer);
+      mapZoneLayer = null;
+    }
+    const geom = data.eum && data.eum.zone_geometry;
+    if (geom) {
+      mapZoneLayer = L.geoJSON(geom, {
+        style: { color: "#3f8cff", weight: 3, dashArray: "6 4", fillColor: "#3f8cff", fillOpacity: 0.15 },
+      }).addTo(leafletMap);
+      leafletMap.fitBounds(mapZoneLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
+    }
+  }
+
   function render(data) {
     resultCard.hidden = false;
+    renderMap(data);
     const refined = (data.vworld && data.vworld.refined_addr) || data.input.address;
     resultMeta.textContent = refined + " · " + data.input.project_type + " " + data.input.target_capacity_kw + "kW";
 

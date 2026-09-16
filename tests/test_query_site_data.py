@@ -34,6 +34,15 @@ def test_eum_failed_falls_back_to_gis_zone_lookup():
     assert result["zone_other_law"] == []
 
 
+def test_eum_failed_falls_back_to_gis_includes_zone_geometry_for_map_display():
+    eum_result = {"status": "no_data", "reason": "빈 응답"}
+    vworld_result = {"status": "ok", "lon": POINT_INSIDE["lon"], "lat": POINT_INSIDE["lat"]}
+
+    result = resolve_zone_info(vworld_result, eum_result, geojson_path=ZONING_FIXTURE)
+
+    assert result["zone_geometry"]["type"] == "Polygon"
+
+
 def test_eum_failed_and_gis_no_match_keeps_original_eum_reason():
     eum_result = {"status": "no_data", "reason": "빈 응답"}
     vworld_result = {"status": "ok", "lon": POINT_OUTSIDE["lon"], "lat": POINT_OUTSIDE["lat"]}
