@@ -29,5 +29,6 @@ UI를 만들기 전에 **eum.go.kr이 Vercel 서버(보통 해외 리전)에서 
 ## 폴더 구성
 - `api/test_eum.py`: 리스크 테스트용 임시 엔드포인트 (본 UI 완성 후 제거 예정)
 - `public/index.html`: 임시 플레이스홀더 페이지
+- `public/guestbook.html`: 방명록 페이지 (강사 요구사항). Supabase 연동 — `SUPABASE_URL`/`SUPABASE_KEY`를 채워야 동작한다. 비워두면 "연결 안 됨" 안내만 표시되고 앱은 정상 동작함
 - `requirements.txt`: 서버리스 함수용 파이썬 패키지 (requests)
 - `vercel.json`: 함수 실행시간 등 Vercel 설정
