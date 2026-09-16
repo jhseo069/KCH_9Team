@@ -35,8 +35,17 @@ EUM_HEADERS = {
 }
 
 
-def vworld_geocode(address: str) -> dict:
-    """브이월드 지오코더 API로 주소 -> 좌표(경위도) 조회. 도로명이 안 되면 지번으로 재시도."""
+def vworld_geocode(address: str, max_attempts: int = 2, retry_delay: float = 0.3,
+                    per_request_timeout: float = 4) -> dict:
+    """브이월드 지오코더 API로 주소 -> 좌표(경위도) 조회. 도로명이 안 되면 지번으로 재시도.
+
+    Vercel(서버리스) 환경에서 이따금 연결이 끊기거나(RemoteDisconnected) 502 Bad Gateway가
+    오는 걸 확인했다(2026-09-16, 이 dev 환경에서는 항상 정상 동작 - eum.go.kr처럼 클라우드
+    트래픽에 불안정한 것으로 추정) - 방식(도로명/지번)별로 네트워크 오류일 때만 짧게 재시도한다.
+    실제로 주소를 못 찾은 경우(NOT_FOUND 등 정상 응답)는 재시도해도 결과가 바뀌지 않으므로
+    재시도하지 않고 바로 다음 방식으로 넘어간다.
+    재시도 횟수/타임아웃은 Vercel Hobby 플랜의 함수 실행시간 한도(10초)를 넘지 않도록 보수적으로 잡았다.
+    """
     url = "https://api.vworld.kr/req/address"
     base_params = {
         "service": "address",
@@ -48,32 +57,42 @@ def vworld_geocode(address: str) -> dict:
         "key": VWORLD_API_KEY,
     }
     last_error = None
+    last_status = None
     for addr_type in ("road", "parcel"):
-        try:
-            res = requests.get(url, params={**base_params, "type": addr_type}, timeout=10)
-        except Exception as e:
-            last_error = f"요청 실패: {e}"
-            continue
-        try:
-            data = res.json()
-        except Exception as e:
-            last_error = f"응답 파싱 실패(status={res.status_code}): {e} / body_preview={res.text[:200]!r}"
-            continue
+        for attempt in range(max_attempts):
+            try:
+                res = requests.get(url, params={**base_params, "type": addr_type}, timeout=per_request_timeout)
+            except Exception as e:
+                last_error = f"요청 실패: {e}"
+                if attempt < max_attempts - 1:
+                    time.sleep(retry_delay)
+                continue
+            try:
+                data = res.json()
+            except Exception as e:
+                last_error = f"응답 파싱 실패(status={res.status_code}): {e} / body_preview={res.text[:200]!r}"
+                if attempt < max_attempts - 1:
+                    time.sleep(retry_delay)
+                continue
 
-        status = data.get("response", {}).get("status")
-        if status == "OK":
-            point = data["response"]["result"]["point"]
-            return {
-                "status": "ok",
-                "type": addr_type,
-                "lon": float(point["x"]),
-                "lat": float(point["y"]),
-                "refined_addr": data["response"]["refined"]["text"],
-            }
+            status = data.get("response", {}).get("status")
+            if status == "OK":
+                point = data["response"]["result"]["point"]
+                return {
+                    "status": "ok",
+                    "type": addr_type,
+                    "lon": float(point["x"]),
+                    "lat": float(point["y"]),
+                    "refined_addr": data["response"]["refined"]["text"],
+                }
+            # 정상 응답이지만 이 방식으로는 못 찾음 - 재시도 의미 없음, 다음 방식으로
+            last_status = status
+            last_error = None
+            break
 
     if last_error is not None:
         return {"status": "no_data", "reason": last_error}
-    return {"status": "no_data", "reason": f"주소를 찾을 수 없습니다 ({status})"}
+    return {"status": "no_data", "reason": f"주소를 찾을 수 없습니다 ({last_status})"}
 
 
 def _parse_node_list(xml_text: str, fields: list) -> list:
