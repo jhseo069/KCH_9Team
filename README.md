@@ -27,6 +27,9 @@
 - `src/export_output.py`: **[5단계] 출력 생성** 스크립트. 4열 판정표(CSV/XLSX) + 사람 검토 목록 생성
 - `output/`: 최종 판정표(`final_table.csv/.xlsx`), 사람 검토 목록(`human_review_needed.csv`)
 - `src/law_lookup.py`: 국가법령정보센터 Open API로 법령 조문 원문 실시간 조회
+- `src/gis_lookup.py`: 좌표 → 용도지역 GIS 조회. eum.go.kr 개별 주소 조회가 클라우드에서 막혀있을 때 대체 경로로 쓰인다(HANDOVER.md §5-2). 전남 지역만 지원
+- `data/zoning_jeonnam.geojson`: 전남 22개 시군구 용도지역 폴리곤(WGS84) — `scripts/build_zoning_geojson.py`로 생성
+- `api/`, `public/`, `vercel.json`, `pyproject.toml`: Vercel 웹앱 배포용(신재생사업본부 팀원 공용). `api/site_judge.py`가 위 파이프라인을 실시간으로 실행하는 API, `public/`이 프론트엔드. 각 폴더 README 참고
 - `src/check_law_updates.py`: **[FR-6] 법령 개정 감시** 스크립트. `rule_table.csv`의 조문을 최신 원문과 대조해 new/changed/unchanged/lookup_failed로 분류 → `data/law_update_alerts.json` (rule_table.csv는 자동 수정하지 않음, 사람이 확인 후 반영). `law_lookup.py`는 지자체 조례(자치법규) 조회도 지원한다(FR-7)
 - `src/run_summary.py`: **[FR-8] 파이프라인 실행 알림** 스크립트. [2]~[6]단계 결과 중 사람이 확인해야 할 항목(no_data/미매칭/판정불가·조건부/법령 changed·lookup_failed)을 모아 `output/run_alerts.json`으로 저장 + 콘솔 요약
 - `PRD.md`: 개발용 상세 명세 (기능요구사항, 데이터 스키마, 완성 기준)

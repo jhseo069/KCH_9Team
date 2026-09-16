@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.normpath(os.path.join(HERE, "..", ".."))
+BASE_DIR = os.path.normpath(os.path.join(HERE, ".."))
 SRC_DIR = os.path.join(BASE_DIR, "src")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 RULE_TABLE_PATH = os.path.join(DATA_DIR, "rule_table.csv")

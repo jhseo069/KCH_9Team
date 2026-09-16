@@ -87,6 +87,14 @@ python src/run_summary.py                                     # [8] 이번 실�
 
 **남은 일**: 아직 `query_site_data.py`의 [2]단계 파이프라인에 연결하지 않았다 — 지금은 `find_zone_by_coordinate` 단독 함수만 있고, 브이월드 지오코딩 결과(좌표) → 이 함수 → `match_regulations.py`가 기대하는 형식으로 잇는 통합 작업이 남아있다. UQ111(용도지역) 레이어만 사용 중이며, UQ112(용도지구)·UQ113(용도구역) 등은 아직 반영 안 함.
 
+## 5-3. 웹앱(Vercel) 구조: webapp/ 하위폴더 → 프로젝트 루트로 이동 (2026-09-16)
+
+처음엔 `webapp/` 하위폴더에 웹앱 전체(`api/`, `public/`, `requirements.txt` 등)를 두고 Vercel의 **Root Directory를 `webapp`으로 설정**하는 방식으로 시작했다. 그런데 이 방식으로는 `src/`, `data/`(용도지역 GeoJSON 등)가 Root Directory 밖에 있어서 **배포 패키지에 아예 포함되지 않는다**는 걸 실측으로 확인했다(`api/site_judge.py`가 배포 후 `ModuleNotFoundError`, `os.path`로 확인해보니 `/var/task`가 곧 `webapp/`이고 그 위 경로가 존재하지 않았음). `src/`를 중복 구현하지 않고 그대로 재사용하는 게 원래 설계 원칙이었으므로, **`webapp/` 폴더를 없애고 그 안의 파일들을 전부 프로젝트 루트로 옮겼다**(`webapp/api/` → `api/`, `webapp/public/` → `public/`, `webapp/vercel.json` → `vercel.json`, `webapp/pyproject.toml` → `pyproject.toml`, `webapp/requirements.txt`는 루트 `requirements.txt`가 이미 같은 패키지를 다 갖고 있어서 삭제).
+
+**따라서 Vercel 프로젝트 설정에서 Root Directory를 빈 값(저장소 루트 그대로)으로 바꿔야 한다** — 예전에 이 문서에 적혀 있던 "Root Directory를 `나만의 AI Agent 개발/부지판정자동화/webapp`으로 설정"이라는 안내는 애초에 잘못됐다: 실제 GitHub 저장소(jhseo069/KCH_9Team)의 루트가 이미 이 `부지판정자동화` 폴더 자체이고(로컬 디스크 경로일 뿐, 저장소 안에는 `나만의 AI Agent 개발`이라는 폴더가 없음), `webapp`도 이제 없어졌으므로 두 세그먼트 다 빼야 한다.
+
+또 하나 실측으로 확인한 이 Vercel Python 런타임의 제약: `api/`에 handler 파일이 여러 개 있으면 **자동으로 파일마다 라우팅해주지 않고**, `pyproject.toml`의 `[tool.vercel] entrypoint`로 정확히 하나를 명시해야 한다(빌드 로그: `Error: No python entrypoint found in default locations, but found potential entrypoints: ...`). 그래서 서버리스 함수는 `api/site_judge.py` 하나만 유지한다(§api/README.md 참고).
+
 ## 5. 알려진 한계 (2026-09-16 기준)
 
 - 브이월드 지적·토지특성정보 API(GetFeature/NED)는 별도 활용신청 미승인 상태 — 지목·면적은 토지이음 응답으로 대체 확보 중
