@@ -1,2 +1,6 @@
 requests
 shapely
+pandas
+beautifulsoup4
+lxml
+python-dotenv

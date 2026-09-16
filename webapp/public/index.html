@@ -1,13 +1,152 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <title>사업 분석자동화 (준비 중)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사업 분석자동화</title>
+<style>
+  :root{ --bg:#f6f7f9; --card:#fff; --ink:#1b2030; --muted:#5b6472; --line:#e6e8ee; --accent:#3f5bd9; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;line-height:1.6}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 20px 80px}
+  h1{font-size:30px;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 28px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin:0 0 20px}
+  label{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
+  input,select{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff;color:var(--ink)}
+  .row{display:flex;gap:12px}
+  .row > div{flex:1}
+  button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:9px;background:var(--accent);
+         color:#fff;font:inherit;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .msg{margin-top:12px;font-size:14px;color:var(--muted);min-height:20px;white-space:pre-wrap}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border-bottom:1px solid var(--line);text-align:left;padding:9px 8px;vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .status-저촉{color:#c0392b;font-weight:700}
+  .status-비저촉{color:#1e8449;font-weight:700}
+  .status-조건부, .status-판정불가{color:#b9770e;font-weight:700}
+  .note{background:#fef4ec;border:1px solid #e2a06a;border-radius:10px;padding:14px 16px;font-size:14.5px;margin-top:8px}
+  .foot{margin-top:8px;font-size:13px;color:var(--muted)}
+  a{color:var(--accent)}
+</style>
 </head>
-<body style="font-family: sans-serif; max-width: 600px; margin: 40px auto;">
+<body>
+<div class="wrap">
+
   <h1>사업 분석자동화</h1>
-  <p>아직 입지분석(부지 규제·인허가 저촉 판정)만 됩니다. 리스크 테스트 결과 확인 후 본 화면을 구성합니다.</p>
-  <p><a href="/api/test_eum">/api/test_eum</a> — eum.go.kr 접근 가능 여부 테스트</p>
+  <p class="sub">아직 입지분석(부지 규제·인허가 저촉 판정)만 됩니다. 주소를 입력하면 실시간으로 판정표를 만듭니다.</p>
+
+  <section class="card">
+    <form id="judge-form">
+      <label for="address">부지 주소</label>
+      <input id="address" required placeholder="예: 목포시 옥암동 1">
+      <div class="row">
+        <div>
+          <label for="project_type">사업 종류</label>
+          <select id="project_type">
+            <option value="태양광">태양광</option>
+            <option value="육상풍력">육상풍력</option>
+            <option value="해상풍력">해상풍력</option>
+          </select>
+        </div>
+        <div>
+          <label for="capacity_kw">용량(kW)</label>
+          <input id="capacity_kw" type="number" min="0" step="0.1" placeholder="예: 990">
+        </div>
+      </div>
+      <button type="submit" id="submit-btn">판정표 만들기</button>
+    </form>
+    <p class="msg" id="form-msg"></p>
+  </section>
+
+  <section class="card" id="result-card" hidden>
+    <div id="result-meta" class="foot"></div>
+    <div id="result-body"></div>
+  </section>
+
   <p><a href="/guestbook.html">방명록</a></p>
+
+</div>
+
+<script>
+  const formEl = document.getElementById("judge-form");
+  const msgEl = document.getElementById("form-msg");
+  const btnEl = document.getElementById("submit-btn");
+  const resultCard = document.getElementById("result-card");
+  const resultMeta = document.getElementById("result-meta");
+  const resultBody = document.getElementById("result-body");
+
+  formEl.addEventListener("submit", async function (event) {
+    event.preventDefault();
+    const address = document.getElementById("address").value.trim();
+    const projectType = document.getElementById("project_type").value;
+    const capacityKw = document.getElementById("capacity_kw").value || "0";
+
+    btnEl.disabled = true;
+    msgEl.textContent = "조회 중... (좌표 변환 -> 용도지역 조회 -> 규제 매칭 -> 판정)";
+    resultCard.hidden = true;
+
+    try {
+      const url = "/api/site_judge?address=" + encodeURIComponent(address) +
+        "&project_type=" + encodeURIComponent(projectType) +
+        "&capacity_kw=" + encodeURIComponent(capacityKw);
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        msgEl.textContent = "오류: " + (data.error || res.status);
+        return;
+      }
+      render(data);
+      msgEl.textContent = "";
+    } catch (e) {
+      msgEl.textContent = "요청 실패: " + e.message;
+    } finally {
+      btnEl.disabled = false;
+    }
+  });
+
+  function render(data) {
+    resultCard.hidden = false;
+    const refined = (data.vworld && data.vworld.refined_addr) || data.input.address;
+    resultMeta.textContent = refined + " · " + data.input.project_type + " " + data.input.target_capacity_kw + "kW";
+
+    if (data.note) {
+      resultBody.innerHTML = '<div class="note">' + escapeHtml(data.note) +
+        '</div><p class="foot">※ 이 시스템은 확실하지 않으면 절대 "비저촉"으로 단정하지 않고 사람 확인을 요구합니다.</p>';
+      return;
+    }
+
+    if (!data.table.length) {
+      resultBody.innerHTML = '<p class="msg">해당 부지에 걸리는 규제 항목을 찾지 못했습니다. (규칙표 미등록 가능성 - 사람 확인 권장)</p>';
+      return;
+    }
+
+    const rows = data.table.map(function (row) {
+      return "<tr>" +
+        "<td>" + escapeHtml(row["항목"] || "") + "</td>" +
+        '<td class="status-' + escapeHtml(row["판정"] || "") + '">' + escapeHtml(row["판정"] || "") + "</td>" +
+        "<td>" + escapeHtml(row["근거조문"] || "") + "</td>" +
+        "<td>" + (row["출처"] ? '<a href="' + escapeAttr(row["출처"]) + '" target="_blank">출처</a>' : "") + "</td>" +
+        "</tr>";
+    }).join("");
+
+    resultBody.innerHTML =
+      "<table><thead><tr><th>항목</th><th>판정</th><th>근거조문</th><th>출처</th></tr></thead><tbody>" +
+      rows + "</tbody></table>" +
+      '<p class="foot">※ "조건부"/"판정불가"는 사람 검토가 필요한 항목입니다.</p>';
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+  function escapeAttr(text) {
+    return String(text).replace(/"/g, "&quot;");
+  }
+</script>
 </body>
 </html>
