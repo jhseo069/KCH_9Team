@@ -217,15 +217,23 @@ def resolve_zone_info(vworld_result: dict, eum_result: dict, geojson_path=None) 
     }
 
 
-def query_site(address_or_jibun: str, project_type: str, target_capacity_kw: float) -> dict:
-    """[1]입력 -> [2]데이터 조회 전체 흐름 실행. raw_query_result 구조를 그대로 반환."""
+def query_site(address_or_jibun: str, project_type: str, target_capacity_kw: float,
+                vworld_result: dict = None) -> dict:
+    """[1]입력 -> [2]데이터 조회 전체 흐름 실행. raw_query_result 구조를 그대로 반환.
+
+    vworld_result를 미리 넘기면(예: 브이월드 지오코더가 서버 환경에서 막혀있어 브라우저에서
+    JSONP로 직접 구해온 좌표, HANDOVER.md §5-4/§5-5 참고) 서버에서 다시 지오코딩하지 않고
+    그 값을 그대로 쓴다. 넘기지 않으면 기존처럼 서버에서 직접 지오코딩한다."""
+    if vworld_result is None:
+        vworld_result = vworld_geocode(address_or_jibun)
+
     result = {
         "input": {
             "address": address_or_jibun,
             "project_type": project_type,
             "target_capacity_kw": target_capacity_kw,
         },
-        "vworld": vworld_geocode(address_or_jibun),
+        "vworld": vworld_result,
         "eum": None,
     }
 

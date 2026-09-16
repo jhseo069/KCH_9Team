@@ -88,6 +88,65 @@
   let mapMarkerLayer = null;
   let mapZoneLayer = null;
   let mapTileLayer = null;
+  let vworldMapKey = "";
+
+  // 페이지 로드 시점에 지도/지오코딩용 브이월드 키를 미리 받아둔다.
+  fetch("/api/site_judge?config=1")
+    .then(function (res) { return res.json(); })
+    .then(function (cfg) { vworldMapKey = cfg.vworld_map_key || ""; })
+    .catch(function () {});
+
+  // 브이월드 지오코더 REST API는 서버(Vercel)에서 부르면 막히고, 브라우저에서 fetch로
+  // 직접 부르면 CORS로 막힌다(HANDOVER.md §5-4/§5-5) - 그런데 JSONP(스크립트 태그로 불러오는
+  // 방식)는 CORS 대상이 아니라서 정상 동작한다. eum.go.kr이 사용자 브라우저에서는 항상 됐던
+  // 것과 같은 원리로, 방문자 브라우저에서 직접 좌표를 구해서 그 결과만 서버로 보낸다.
+  function geocodeJsonpOnce(address, addrType, timeoutMs) {
+    return new Promise(function (resolve) {
+      if (!vworldMapKey) {
+        resolve({ok: false, reason: "브이월드 키를 아직 못 받아왔습니다. 잠시 후 다시 시도해주세요."});
+        return;
+      }
+      const cbName = "vw_geocode_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+      const script = document.createElement("script");
+      let done = false;
+      function cleanup() {
+        delete window[cbName];
+        script.remove();
+      }
+      window[cbName] = function (data) {
+        done = true;
+        cleanup();
+        const status = data && data.response && data.response.status;
+        if (status === "OK") {
+          const point = data.response.result.point;
+          resolve({
+            ok: true,
+            lon: parseFloat(point.x),
+            lat: parseFloat(point.y),
+            refined_addr: data.response.refined.text,
+          });
+        } else {
+          resolve({ok: false, reason: "주소를 찾을 수 없습니다 (" + status + ")"});
+        }
+      };
+      script.onerror = function () {
+        if (!done) { resolve({ok: false, reason: "지오코딩 요청 실패"}); cleanup(); }
+      };
+      setTimeout(function () {
+        if (!done) { resolve({ok: false, reason: "지오코딩 응답 시간초과"}); cleanup(); }
+      }, timeoutMs || 5000);
+      const base = "https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0" +
+        "&crs=epsg:4326&format=json&key=" + vworldMapKey + "&address=" + encodeURIComponent(address);
+      script.src = base + "&type=" + addrType + "&callback=" + cbName;
+      document.body.appendChild(script);
+    });
+  }
+
+  async function geocodeJsonp(address) {
+    const road = await geocodeJsonpOnce(address, "road");
+    if (road.ok) return road;
+    return geocodeJsonpOnce(address, "parcel");
+  }
 
   formEl.addEventListener("submit", async function (event) {
     event.preventDefault();
@@ -96,13 +155,22 @@
     const capacityKw = document.getElementById("capacity_kw").value || "0";
 
     btnEl.disabled = true;
-    msgEl.textContent = "조회 중... (좌표 변환 -> 용도지역 조회 -> 규제 매칭 -> 판정)";
+    msgEl.textContent = "좌표 변환 중... (브라우저에서 직접 조회)";
     resultCard.hidden = true;
 
     try {
+      const geo = await geocodeJsonp(address);
+      if (!geo.ok) {
+        msgEl.textContent = "주소 조회 실패: " + geo.reason;
+        return;
+      }
+
+      msgEl.textContent = "용도지역 조회 -> 규제 매칭 -> 판정 중...";
       const url = "/api/site_judge?address=" + encodeURIComponent(address) +
         "&project_type=" + encodeURIComponent(projectType) +
-        "&capacity_kw=" + encodeURIComponent(capacityKw);
+        "&capacity_kw=" + encodeURIComponent(capacityKw) +
+        "&lon=" + geo.lon + "&lat=" + geo.lat +
+        "&refined_addr=" + encodeURIComponent(geo.refined_addr);
       const res = await fetch(url);
       const data = await res.json();
 

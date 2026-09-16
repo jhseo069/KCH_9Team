@@ -44,8 +44,8 @@ except Exception as e:
     }
 
 
-def run_pipeline(address: str, project_type: str, capacity_kw: float) -> dict:
-    raw = query_site(address, project_type, capacity_kw)
+def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_result: dict = None) -> dict:
+    raw = query_site(address, project_type, capacity_kw, vworld_result=vworld_result)
     eum_result = raw.get("eum") or {}
 
     response = {
@@ -73,6 +73,13 @@ def run_pipeline(address: str, project_type: str, capacity_kw: float) -> dict:
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
+
+        # 지도 타일용 키를 페이지 로드 시점(주소 입력 전)에 미리 받아가기 위한 설정 조회.
+        # src/ import 여부와 무관하게 항상 동작해야 하므로 아래 IMPORT_ERROR 체크보다 앞에 둔다.
+        if "config" in query:
+            self._send_json({"vworld_map_key": os.environ.get("VWORLD_API_KEY", "")})
+            return
+
         address = (query.get("address") or [""])[0].strip()
         project_type = (query.get("project_type") or ["태양광"])[0]
         try:
@@ -88,8 +95,26 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"error": "address 파라미터가 필요합니다"}, status=400)
             return
 
+        # 브라우저가 브이월드 지오코더를 JSONP로 직접 호출해서 얻은 좌표를 넘겨준 경우
+        # (서버 환경에서 지오코더가 막혀있는 문제 우회, HANDOVER.md §5-5) - 있으면 그대로 쓰고
+        # 서버에서 다시 지오코딩하지 않는다.
+        lon_raw = (query.get("lon") or [""])[0]
+        lat_raw = (query.get("lat") or [""])[0]
+        vworld_result = None
+        if lon_raw and lat_raw:
+            try:
+                vworld_result = {
+                    "status": "ok",
+                    "type": "client_jsonp",
+                    "lon": float(lon_raw),
+                    "lat": float(lat_raw),
+                    "refined_addr": (query.get("refined_addr") or [address])[0],
+                }
+            except ValueError:
+                vworld_result = None
+
         try:
-            result = run_pipeline(address, project_type, capacity_kw)
+            result = run_pipeline(address, project_type, capacity_kw, vworld_result=vworld_result)
             self._send_json(result)
         except Exception as e:
             self._send_json({"error": f"{type(e).__name__}: {e}"}, status=500)
