@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+
+# 실행할 때마다 재생성되는 결과물 (소스가 아님) - rule_table.csv는 예외로 계속 추적
+data/*.json
+output/
