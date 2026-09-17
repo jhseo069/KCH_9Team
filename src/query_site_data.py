@@ -19,7 +19,7 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-from gis_lookup import find_zone_by_coordinate
+from zone_db import ZoneDbUnavailable, find_zone_in_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -186,17 +186,29 @@ def eum_get_land_detail(pnu: str, session: requests.Session) -> dict:
     }
 
 
-def resolve_zone_info(vworld_result: dict, eum_result: dict, geojson_path=None) -> dict:
-    """토지이음(eum) 개별조회가 실패했을 때, 브이월드 좌표로 GIS 용도지역 조회(전남만 가능)를
-    대신 시도한다. eum이 이미 성공했으면 그대로 두고(더 상세한 지목·면적 정보를 갖고 있으므로),
-    GIS도 실패하면(좌표 없음/매칭 0건/매칭 2건 이상) eum의 원래 실패 사유를 그대로 사람에게 남긴다."""
+def resolve_zone_info(vworld_result: dict, eum_result: dict, zone_lookup=None) -> dict:
+    """토지이음(eum) 개별조회가 실패했을 때, 브이월드 좌표로 용도지역 DB 조회를 대신 시도한다.
+
+    eum이 이미 성공했으면 그대로 둔다(지목·면적 등 더 상세한 정보를 갖고 있으므로).
+    조회가 실패하면(좌표 없음/매칭 0건/매칭 2건 이상/DB 장애) eum의 원래 실패 사유에
+    실패 원인을 덧붙여 사람에게 넘긴다 - 어느 경우에도 용도지역을 추측하지 않는다.
+
+    DB 장애는 '매칭 0건'과 구분해서 남긴다. 둘 다 판정은 안 나오지만 대응이 다르다:
+    전자는 다시 조회해봐야 할 일이고, 후자는 그 좌표에 실제로 용도지역이 없다는 사실이다.
+    """
     if eum_result.get("status") == "ok":
         return eum_result
     if vworld_result.get("status") != "ok":
         return eum_result
 
-    kwargs = {"geojson_path": geojson_path} if geojson_path is not None else {}
-    zone_result = find_zone_by_coordinate(vworld_result["lon"], vworld_result["lat"], **kwargs)
+    lookup = zone_lookup or find_zone_in_db
+    try:
+        zone_result = lookup(vworld_result["lon"], vworld_result["lat"])
+    except ZoneDbUnavailable as e:
+        return {
+            **eum_result,
+            "reason": f"{eum_result.get('reason', '')} / {e}",
+        }
 
     if zone_result["status"] != "ok":
         return {
