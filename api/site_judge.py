@@ -31,6 +31,7 @@ try:
     import pandas as pd  # noqa: E402
     from export_output import generate_output_table  # noqa: E402
     from judge import judge  # noqa: E402
+    from law_lookup import lookup_article_text  # noqa: E402
     from match_regulations import match_regulations  # noqa: E402
     from query_site_data import query_site  # noqa: E402
     from setback_check import check_setback, to_judgment_row, unevaluated_judgment_row  # noqa: E402
@@ -47,6 +48,61 @@ except Exception as e:
 
 
 SETBACK_TABLE_PATH = os.path.join(DATA_DIR, "setback_table.csv")
+
+
+def build_config() -> dict:
+    """페이지 로드 시점에 클라이언트가 필요로 하는 공개 설정값.
+
+    브라우저가 Supabase를 직접 호출해 용도지역 레이어를 받아가므로 URL과 공개 키가
+    필요하다. publishable 키는 애초에 브라우저 노출용이고 RLS가 읽기만 허용한다.
+    SUPABASE_SECRET_KEY(전권 키)는 어떤 경우에도 여기에 넣지 않는다.
+    """
+    return {
+        "vworld_map_key": os.environ.get("VWORLD_API_KEY", ""),
+        "supabase_url": os.environ.get("SUPABASE_URL", ""),
+        "supabase_key": os.environ.get("SUPABASE_PUBLISHABLE_KEY", ""),
+    }
+
+
+def missing_input_reason(query: dict):
+    """판정에 필요한 입력이 없으면 사유를, 있으면 None을 돌려준다.
+
+    지도 클릭은 주소 문자열 없이 좌표만 보낸다. 주소를 필수로 두면 클릭 판정이 막힌다.
+    """
+    address = (query.get("address") or [""])[0].strip()
+    lon = (query.get("lon") or [""])[0].strip()
+    lat = (query.get("lat") or [""])[0].strip()
+    if address or (lon and lat):
+        return None
+    return "주소 또는 좌표(lon/lat)가 필요합니다"
+
+
+def route_for(path: str) -> str:
+    """요청 경로(쿼리스트링 포함) -> 처리 이름.
+
+    이 Vercel 프로젝트는 api/ 에 handler 파일을 하나만 둘 수 있어서(pyproject.toml의
+    entrypoint로 고정) 엔드포인트를 파일로 늘릴 수 없다. Vercel의 제로 설정 Python
+    빌더는 api/site_judge.py를 URL /api/site_judge 하나에만 매핑하므로(하위 경로는
+    404) 서브패스가 아니라 쿼리 파라미터(law=1)로 분기한다. 값이 아니라 파라미터
+    존재 자체로 판단하므로 address=law 같은 값은 걸리지 않는다.
+    """
+    return "law" if "law" in parse_qs(urlparse(path).query) else "judge"
+
+
+def fetch_law(query: dict) -> dict:
+    """판정 근거 조문의 원문을 law.go.kr에서 실시간 조회한다.
+
+    규칙표(rule_table.csv)에도 발췌본이 있지만 담아둔 시점의 사본이다. 법령 탭은
+    지금 시행 중인 원문을 보여주는 것이 목적이므로 매번 새로 가져온다.
+    """
+    law_name = (query.get("law_name") or [""])[0].strip()
+    law_article = (query.get("law_article") or [""])[0].strip()
+    if not law_name or not law_article:
+        return {"status": "no_data", "reason": "law_name과 law_article이 필요합니다"}
+    try:
+        return lookup_article_text(law_name, law_article)
+    except Exception as e:
+        return {"status": "no_data", "reason": f"조문 조회 실패: {type(e).__name__}: {e}"}
 
 
 def _judge_setback(eum_result: dict, project_type: str, exemptions: list, apply_date_str: str) -> dict:
@@ -110,18 +166,49 @@ def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_res
     judged.append(setback_row)
 
     df = generate_output_table(judged)
-    response["table"] = df.to_dict(orient="records")
+    response["table"] = dataframe_to_json_records(df)
     return response
+
+
+def dataframe_to_json_records(df: "pd.DataFrame") -> list:
+    """판정표 DataFrame -> JSON 응답에 안전하게 실을 수 있는 레코드 리스트.
+
+    generate_output_table()의 "비고" 열은 item.get("note")를 그대로 옮기는데, note가
+    없는 행(judge()가 만든 대부분의 행)은 pandas가 float('nan')으로 채운다.
+    json.dumps는 그 NaN을 표준 JSON이 아닌 bare 토큰 NaN으로 내보내고, 브라우저의
+    JSON.parse는 이를 거부해서 판정 결과가 화면에 아예 안 뜬다 - 파이썬 requests.json()은
+    NaN을 관대하게 받아줘서 이 문제가 그동안 테스트를 통과해왔다. generate_output_table의
+    반환 타입(DataFrame)은 CSV/XLSX 내보내기(export_output.export_outputs)가 그대로
+    의존하므로 바꾸지 않고, API 직렬화 경계인 여기서만 to_dict 직전에 결측값을
+    None(JSON null)으로 바꾼다.
+    """
+    records = df.to_dict(orient="records")
+    for record in records:
+        for key, value in record.items():
+            # df.where(df.notna(), None)으로는 안 된다 - pandas의 문자열 dtype 열은
+            # where()로 넣은 None을 자기 NA 표현으로 되돌려서 to_dict 결과에 다시
+            # float('nan')이 남는다(실측 확인됨). 그래서 to_dict 이후 값 단위로 훑어서
+            # 결측만 None으로 바꾼다.
+            if pd.isna(value):
+                record[key] = None
+    return records
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
 
+        if route_for(self.path) == "law":
+            if IMPORT_ERROR is not None:
+                self._send_json({"status": "no_data", "reason": "서버 모듈 로드 실패"}, status=500)
+                return
+            self._send_json(fetch_law(query))
+            return
+
         # 지도 타일용 키를 페이지 로드 시점(주소 입력 전)에 미리 받아가기 위한 설정 조회.
         # src/ import 여부와 무관하게 항상 동작해야 하므로 아래 IMPORT_ERROR 체크보다 앞에 둔다.
         if "config" in query:
-            self._send_json({"vworld_map_key": os.environ.get("VWORLD_API_KEY", "")})
+            self._send_json(build_config())
             return
 
         address = (query.get("address") or [""])[0].strip()
@@ -137,8 +224,9 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"error": "import_failed", "detail": IMPORT_ERROR}, status=500)
             return
 
-        if not address:
-            self._send_json({"error": "address 파라미터가 필요합니다"}, status=400)
+        reason = missing_input_reason(query)
+        if reason:
+            self._send_json({"error": reason}, status=400)
             return
 
         # 브라우저가 브이월드 지오코더를 JSONP로 직접 호출해서 얻은 좌표를 넘겨준 경우
@@ -168,8 +256,22 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"error": f"{type(e).__name__}: {e}"}, status=500)
 
     def _send_json(self, payload: dict, status: int = 200):
+        # allow_nan=False: NaN/Infinity가 payload에 남아있으면 여기서 바로 터뜨린다.
+        # 기본값(allow_nan=True)은 bare NaN/Infinity 토큰을 내보내는데, 그건 표준 JSON이
+        # 아니라서 브라우저 JSON.parse가 거부한다 - 응답의 status가 200이어도 화면에는
+        # 아무 판정도 뜨지 않는 방식으로 조용히 깨진다. 직렬화가 실패하면 500과 함께
+        # 사람이 읽을 수 있는 JSON 에러를 대신 돌려줘서, 이 안전장치 자체가 정상 응답을
+        # 깨뜨리는 일이 없게 한다.
+        try:
+            body = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        except ValueError as e:
+            status = 500
+            body = json.dumps(
+                {"error": f"serialization_failed: {type(e).__name__}: {e}"},
+                ensure_ascii=False,
+            ).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+        self.wfile.write(body)

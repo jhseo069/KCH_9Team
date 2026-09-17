@@ -3,7 +3,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from query_site_data import resolve_zone_info
+import query_site_data
+from query_site_data import eum_get_land_detail, eum_resolve_pnu, query_site, resolve_zone_info
 from zone_db import ZoneDbUnavailable
 
 COORDS = {"status": "ok", "lon": 126.39, "lat": 34.81}
@@ -112,3 +113,95 @@ def test_db_outage_is_reported_as_an_outage_not_as_no_match():
     assert result["status"] == "no_data"
     assert "용도지역 DB" in result["reason"]
     assert "503" in result["reason"]
+
+
+# ---------------------------------------------------------------------------
+# 지도 클릭(빈 주소) -> 토지이음이 PNU 없는 노드를 돌려주는 경우
+# (2026-09-17 map-first-ui에서 발견된 크래시: eum_resolve_pnu가 status="ok"와
+#  pnu=None을 같이 반환해서 eum_get_land_detail이 pnu[2:5]에서 TypeError로 죽었다)
+# ---------------------------------------------------------------------------
+
+class _FakeResponse:
+    """requests.Response 흉내 - .encoding 대입, .json() 만 있으면 충분"""
+
+    def __init__(self, json_data):
+        self._json_data = json_data
+        self.encoding = None
+        self.status_code = 200
+        self.text = ""
+
+    def json(self):
+        return self._json_data
+
+
+def test_eum_resolve_pnu_returns_no_data_when_nodes_carry_no_pnu():
+    """실제 파싱 경로(_parse_node_list)를 거치도록 XML 응답을 그대로 흉내낸다.
+
+    노드는 있지만 <pnu> 엘리먼트가 없는 경우 - eum.go.kr이 빈 키워드(지도 클릭)에
+    이런 응답을 준다. status는 절대 "ok"가 되면 안 된다.
+    """
+    xml_without_pnu = "<root><node><fullStr>부산 어딘가</fullStr></node></root>"
+
+    class FakeSession:
+        def post(self, url, data=None, headers=None, timeout=None):
+            return _FakeResponse({
+                "jibunBonBuList": xml_without_pnu,
+                "roadBonBuList": None,
+                "bldList": None,
+                "jibunList": None,
+                "roadList": None,
+            })
+
+    result = eum_resolve_pnu("", FakeSession())
+
+    assert result["status"] != "ok"
+    assert "PNU" in result["reason"] or "필지고유번호" in result["reason"]
+
+
+def test_eum_get_land_detail_with_none_pnu_returns_no_data_instead_of_raising():
+    result = eum_get_land_detail(None, session=None)
+
+    assert result["status"] == "no_data"
+    assert result["reason"]
+
+
+def test_query_site_map_click_outside_coverage_does_not_raise():
+    """query_site 전체 흐름: 지도에서 커버리지 밖을 클릭 -> address="" 로 들어온다.
+
+    이 테스트가 있었다면 리포트된 크래시(TypeError: 'NoneType' object is not
+    subscriptable)를 잡아냈을 것이다. 500 대신 사람이 읽을 수 있는 사유가 나와야 한다.
+    """
+    xml_without_pnu = "<root><node><fullStr>부산 어딘가</fullStr></node></root>"
+
+    class FakeSession:
+        def get(self, url, headers=None, timeout=None):
+            return _FakeResponse({})
+
+        def post(self, url, data=None, headers=None, timeout=None):
+            return _FakeResponse({
+                "jibunBonBuList": xml_without_pnu,
+                "roadBonBuList": None,
+                "bldList": None,
+                "jibunList": None,
+                "roadList": None,
+            })
+
+    def fake_zone_lookup_no_match(lon, lat):
+        return {"status": "no_match", "reason": "해당 좌표를 포함하는 용도지역 폴리곤이 없음"}
+
+    orig_session_cls = query_site_data.requests.Session
+    orig_find_zone_in_db = query_site_data.find_zone_in_db
+    query_site_data.requests.Session = FakeSession
+    query_site_data.find_zone_in_db = fake_zone_lookup_no_match
+    try:
+        result = query_site("", "태양광", 990.0, vworld_result={
+            "status": "ok", "type": "client_jsonp",
+            "lon": 129.0756, "lat": 35.1796, "refined_addr": "부산",
+        })
+    finally:
+        query_site_data.requests.Session = orig_session_cls
+        query_site_data.find_zone_in_db = orig_find_zone_in_db
+
+    assert result["eum"]["status"] != "ok"
+    reason = result["eum"]["reason"]
+    assert isinstance(reason, str) and len(reason) > 0
