@@ -258,6 +258,19 @@ def query_site(address_or_jibun: str, project_type: str, target_capacity_kw: flo
         "eum": None,
     }
 
+    if not (address_or_jibun or "").strip():
+        # 지도 클릭 등 주소 없이 좌표만 들어온 경우: 토지이음(eum.go.kr)은 조회할 키워드가
+        # 없어 어차피 실패하고, Vercel에서는 eum.go.kr 자체가 응답하지 않아(HANDOVER.md §4)
+        # 세션 초기화 + PNU 조회 각각 최대 10초씩(최대 20초) 낭비하다가 함수 실행시간
+        # 한도(10초)를 넘겨 504로 죽는다. 조회할 주소가 없으니 이 경로를 아예 건너뛰고
+        # 좌표 기반 용도지역 조회로 바로 넘어간다.
+        no_address_result = {
+            "status": "no_data",
+            "reason": "지도 클릭으로 주소 정보가 없어 토지이음(eum) 조회를 건너뛰고 좌표 기반 용도지역 조회를 사용했습니다",
+        }
+        result["eum"] = resolve_zone_info(result["vworld"], no_address_result)
+        return result
+
     session = requests.Session()
     session.get(EUM_DET_URL, headers=EUM_HEADERS, timeout=10)  # 세션(쿠키) 초기화
 

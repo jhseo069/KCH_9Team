@@ -205,3 +205,97 @@ def test_query_site_map_click_outside_coverage_does_not_raise():
     assert result["eum"]["status"] != "ok"
     reason = result["eum"]["reason"]
     assert isinstance(reason, str) and len(reason) > 0
+
+
+# ---------------------------------------------------------------------------
+# 지도 클릭(빈 주소) -> eum.go.kr을 아예 건드리지 않아야 함
+# (2026-09-18 프로덕션 504: eum.go.kr이 Vercel에서 응답하지 않아 세션 초기화 +
+#  PNU 조회가 각각 최대 10초씩 낭비되다 함수 실행시간 한도(10초)를 넘겼다.
+#  주소가 없으면 애초에 eum이 조회할 대상이 없으므로 이 경로 자체를 건너뛴다)
+# ---------------------------------------------------------------------------
+
+class _ExplodingSession:
+    """생성되는 순간 실패 - 주소가 없을 때 세션조차 만들어지면 안 된다"""
+
+    def __init__(self, *args, **kwargs):
+        raise AssertionError("주소가 없는데 requests.Session()이 생성되었다")
+
+
+def _exploding_eum_resolve_pnu(keyword, session):
+    raise AssertionError("주소가 없는데 eum_resolve_pnu가 호출되었다")
+
+
+def test_query_site_empty_address_does_not_touch_eum():
+    orig_session_cls = query_site_data.requests.Session
+    orig_eum_resolve_pnu = query_site_data.eum_resolve_pnu
+    orig_find_zone_in_db = query_site_data.find_zone_in_db
+    query_site_data.requests.Session = _ExplodingSession
+    query_site_data.eum_resolve_pnu = _exploding_eum_resolve_pnu
+    query_site_data.find_zone_in_db = lookup_ok()
+    try:
+        # 예외 없이 끝나야 한다 - 예외가 나면 eum 경로가 건드려졌다는 뜻
+        query_site("", "태양광", 990.0, vworld_result=COORDS)
+    finally:
+        query_site_data.requests.Session = orig_session_cls
+        query_site_data.eum_resolve_pnu = orig_eum_resolve_pnu
+        query_site_data.find_zone_in_db = orig_find_zone_in_db
+
+
+def test_query_site_empty_address_still_resolves_zone_via_coordinates():
+    orig_session_cls = query_site_data.requests.Session
+    orig_eum_resolve_pnu = query_site_data.eum_resolve_pnu
+    orig_find_zone_in_db = query_site_data.find_zone_in_db
+    query_site_data.requests.Session = _ExplodingSession
+    query_site_data.eum_resolve_pnu = _exploding_eum_resolve_pnu
+    query_site_data.find_zone_in_db = lookup_ok("계획관리지역", sgg_cd="46110")
+    try:
+        result = query_site("", "태양광", 990.0, vworld_result=COORDS)
+    finally:
+        query_site_data.requests.Session = orig_session_cls
+        query_site_data.eum_resolve_pnu = orig_eum_resolve_pnu
+        query_site_data.find_zone_in_db = orig_find_zone_in_db
+
+    assert result["eum"]["status"] == "ok"
+    assert result["eum"]["source"] == "gis"
+    assert result["eum"]["zone_national_law"] == ["계획관리지역"]
+    assert result["eum"]["sgg_cd"] == "46110"
+
+
+def test_query_site_with_address_still_attempts_eum_path():
+    """주소가 있으면 지금처럼 eum 경로를 그대로 타야 한다.
+
+    이 테스트가 없으면 "주소 유무와 상관없이 eum을 항상 건너뛴다"로 잘못
+    단순화된 수정도 통과해버린다 - eum은 주소가 있을 때는 지목·면적 등
+    좌표 조회보다 더 상세한 정보를 주므로 그 경우엔 기다릴 가치가 있다.
+    """
+    calls = {"get": 0, "post": 0}
+
+    class FakeSession:
+        def get(self, url, headers=None, timeout=None):
+            calls["get"] += 1
+            return _FakeResponse({})
+
+        def post(self, url, data=None, headers=None, timeout=None):
+            calls["post"] += 1
+            return _FakeResponse({
+                "jibunBonBuList": None,
+                "roadBonBuList": None,
+                "bldList": None,
+                "jibunList": None,
+                "roadList": None,
+            })
+
+    orig_session_cls = query_site_data.requests.Session
+    orig_find_zone_in_db = query_site_data.find_zone_in_db
+    query_site_data.requests.Session = FakeSession
+    # eum이 PNU를 못 찾아 좌표 폴백으로 넘어가면 find_zone_in_db도 requests.Session()을
+    # 만드는데(zone_db.py), 위에서 바꿔치기한 FakeSession은 그 용도가 아니므로 막아준다.
+    query_site_data.find_zone_in_db = lookup_no_match
+    try:
+        query_site("목포시 옥암동 1", "태양광", 990.0, vworld_result=COORDS)
+    finally:
+        query_site_data.requests.Session = orig_session_cls
+        query_site_data.find_zone_in_db = orig_find_zone_in_db
+
+    assert calls["get"] == 1, "eum 세션 초기화(session.get)가 호출되지 않았다"
+    assert calls["post"] == 1, "eum PNU 조회(session.post)가 호출되지 않았다"
