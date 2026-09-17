@@ -41,8 +41,17 @@ COLUMNS = [
 
 
 def _article_label(jo):
-    """조문번호(6자리, 조번호*100+가지번호)를 '제N조' 또는 '제N조의M' 표기로 변환."""
-    n = int(jo.findtext("조문번호"))
+    """조문번호(6자리, 조번호*100+가지번호)를 '제N조' 또는 '제N조의M' 표기로 변환.
+
+    조문번호가 없거나 정수로 해석되지 않는 비정상 조는 예외를 던지는 대신
+    원본 값을 그대로 노출해(추측하지 않고) 이상을 눈에 보이게 한다."""
+    raw = jo.findtext("조문번호")
+    if raw is None:
+        return "(조문번호 불명)"
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return f"(조문번호 해석 불가: {raw})"
     base, branch = divmod(n, 100)
     return f"제{base}조" + (f"의{branch}" if branch else "")
 
@@ -83,7 +92,15 @@ def collect_one(sgg_nm):
 def main():
     rows = []
     for sgg_cd, sgg_nm in sorted(JEONNAM_SGG.items()):
-        ordinance_name, found, fail_reason = collect_one(sgg_nm)
+        try:
+            ordinance_name, found, fail_reason = collect_one(sgg_nm)
+        except Exception as e:
+            # 시군구 하나에서 예상 못한 예외가 나도 전체 실행을 중단하지 않는다 -
+            # 실패 행을 남기고 다음 시군구로 넘어가야 "확인 안 함"이 눈에 보인다.
+            ordinance_name = f"{sgg_nm} 도시계획 조례"
+            found = []
+            fail_reason = f"예상치 못한 오류 {type(e).__name__}: {e}"
+
         if fail_reason is not None:
             rows.append({
                 "sgg_cd": sgg_cd, "sgg_nm": sgg_nm, "project_type": "태양광",
