@@ -271,11 +271,12 @@
         '<td class="status-' + escapeHtml(row["판정"] || "") + '">' + escapeHtml(row["판정"] || "") + "</td>" +
         "<td>" + escapeHtml(row["근거조문"] || "") + "</td>" +
         "<td>" + (row["출처"] ? '<a href="' + escapeAttr(row["출처"]) + '" target="_blank">출처</a>' : "") + "</td>" +
+        "<td>" + escapeHtml(row["비고"] || "") + "</td>" +
         "</tr>";
     }).join("");
 
     resultBody.innerHTML =
-      "<table><thead><tr><th>항목</th><th>판정</th><th>근거조문</th><th>출처</th></tr></thead><tbody>" +
+      "<table><thead><tr><th>항목</th><th>판정</th><th>근거조문</th><th>출처</th><th>비고</th></tr></thead><tbody>" +
       rows + "</tbody></table>" +
       '<p class="foot">※ "조건부"/"판정불가"는 사람 검토가 필요한 항목입니다.</p>';
   }

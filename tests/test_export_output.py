@@ -19,7 +19,7 @@ def _judgment_result_3items():
 def test_generate_output_table_has_correct_columns():
     df = generate_output_table(_judgment_result_3items())
 
-    assert list(df.columns) == ["항목", "판정", "근거조문", "출처"]
+    assert list(df.columns) == ["항목", "판정", "근거조문", "출처", "비고"]
 
 
 def test_generate_output_table_maps_fields_correctly():
@@ -30,6 +30,23 @@ def test_generate_output_table_maps_fields_correctly():
     assert first_row["판정"] == "저촉"
     assert first_row["근거조문"] == "완충녹지 조문"
     assert first_row["출처"] == "https://law.go.kr/R001"
+
+
+def test_generate_output_table_carries_note_into_bigo_column():
+    df = generate_output_table(_judgment_result_3items())
+
+    # 세 번째 항목은 note가 있음 - 비고 열에 그대로 나와야 사람이 판정불가 사유를 알 수 있다.
+    third_row = df.iloc[2]
+    assert third_row["항목"] == "테스트미등록규제구역"
+    assert third_row["비고"] == "규칙표에 없는 신규 표기 - 사람 검토 필요"
+
+
+def test_generate_output_table_note_missing_yields_empty_bigo():
+    # note가 없는 행(첫 번째 항목)은 예외 없이 빈 값(None)이어야 한다.
+    df = generate_output_table(_judgment_result_3items())
+
+    first_row = df.iloc[0]
+    assert first_row["비고"] is None or pd.isna(first_row["비고"])
 
 
 def test_export_outputs_creates_csv_and_xlsx_with_matching_row_count(tmp_path):
@@ -47,7 +64,7 @@ def test_export_outputs_creates_csv_and_xlsx_with_matching_row_count(tmp_path):
     xlsx_df = pd.read_excel(xlsx_path)
     assert len(csv_df) == 3
     assert len(xlsx_df) == 3
-    assert list(csv_df.columns) == ["항목", "판정", "근거조문", "출처"]
+    assert list(csv_df.columns) == ["항목", "판정", "근거조문", "출처", "비고"]
 
 
 def test_human_review_needed_contains_only_judgeless_and_conditional(tmp_path):
