@@ -181,7 +181,9 @@ def _lookup(law_name: str, oc: str, parse_fn, not_found_reason: str) -> dict:
         "text": parsed["text"],
         "article_title": parsed["article_title"],
         "effective_date": parsed["effective_date"],
-        "source_url": f"{LAW_SERVICE_URL}?OC={oc}&target=law&MST={search_result['mst']}&type=HTML",
+        # OC는 개인 접근키이므로 저장/노출되는 URL에는 절대 포함하지 않는다(I6) -
+        # 이 URL은 draft CSV -> setback_table.csv -> 웹앱 출처 링크로 그대로 흘러간다.
+        "source_url": f"{LAW_SERVICE_URL}?target=law&MST={search_result['mst']}&type=HTML",
     }
 
 
@@ -217,14 +219,18 @@ def fetch_ordinance_xml(mst: str, oc: str = DEFAULT_OC) -> str:
     return res.text
 
 
-def parse_ordinance_article(xml_text: str, article_no: str) -> dict | None:
-    """자치법규 전문 XML에서 article_no에 해당하는 조문을 추출.
+def parse_ordinance_article(xml_text: str, article_no: str, branch_no: str | None = None) -> dict | None:
+    """자치법규 전문 XML에서 article_no(+가지번호)에 해당하는 조문을 추출.
     국가법령과 스키마가 달라 별도 구현 - 항/호 구분 없이 조내용 하나에 전문이 들어 있고,
-    조문번호는 '조번호*100'을 6자리로 0-패딩한 형식(예: 제27조 -> '002700')이다.
+    조문번호는 '조번호*100 + 가지번호'를 6자리로 0-패딩한 형식이다
+    (예: 제27조 -> '002700', 제17조의4 -> '001704'). scripts/collect_setback_draft.py의
+    _article_label()이 divmod(n, 100)으로 이 인코딩을 반대로 복원하고 있으므로, 여기서도
+    같은 관계를 사용한다. 가지번호를 무시하면 제17조 조회가 제17조의4 조문과 뒤섞인다.
     조문여부가 'Y'인 것만 실제 조문(장/절 헤더는 'N')이다."""
     root = ET.fromstring(xml_text)
     effective_date = root.findtext(".//자치법규기본정보/시행일자")
-    padded_no = f"{int(article_no) * 100:06d}"
+    branch = int(branch_no) if branch_no else 0
+    padded_no = f"{int(article_no) * 100 + branch:06d}"
 
     for jo in root.findall(".//조문/조"):
         if jo.findtext("조문번호") != padded_no:
@@ -240,10 +246,15 @@ def parse_ordinance_article(xml_text: str, article_no: str) -> dict | None:
 
 
 def lookup_ordinance_text(ordinance_name: str, law_article: str, oc: str = DEFAULT_OC) -> dict:
-    """자치법규(조례)명+조문번호 표기 -> 조문 원문 조회. 국가법령과 API 스키마가 달라 별도 구현."""
-    article_no = extract_article_number(law_article)
-    if article_no is None:
+    """자치법규(조례)명+조문번호 표기 -> 조문 원문 조회. 국가법령과 API 스키마가 달라 별도 구현.
+
+    국가법령 경로(lookup_article_text)처럼 가지번호를 구분한다(I4) - extract_article_number만
+    쓰면 '제17조의4'가 '17'로 뭉개져 제17조 본문이 조용히 반환된다."""
+    parts = extract_article_parts(law_article)
+    if parts is None:
         return {"status": "no_data", "reason": f"조문번호를 해석할 수 없음: '{law_article}'"}
+    article_no, branch_no = parts
+    label = f"제{article_no}조" + (f"의{branch_no}" if branch_no else "")
 
     search_result = search_ordinance_mst(ordinance_name, oc)
     if search_result["status"] != "ok":
@@ -255,19 +266,20 @@ def lookup_ordinance_text(ordinance_name: str, law_article: str, oc: str = DEFAU
         return {"status": "no_data", "reason": f"조회 실패: {e}"}
 
     try:
-        parsed = parse_ordinance_article(xml_text, article_no)
+        parsed = parse_ordinance_article(xml_text, article_no, branch_no)
     except ET.ParseError as e:
         return {"status": "no_data", "reason": f"응답 파싱 실패: {e}"}
 
     if parsed is None:
-        return {"status": "no_data", "reason": f"{ordinance_name}에서 제{article_no}조를 찾을 수 없음"}
+        return {"status": "no_data", "reason": f"{ordinance_name}에서 {label}를 찾을 수 없음"}
 
     return {
         "status": "ok",
         "text": parsed["text"],
         "article_title": parsed["article_title"],
         "effective_date": parsed["effective_date"],
-        "source_url": f"{LAW_SERVICE_URL}?OC={oc}&target=ordin&MST={search_result['mst']}&type=HTML",
+        # OC는 개인 접근키이므로 저장/노출되는 URL에는 절대 포함하지 않는다(I6).
+        "source_url": f"{LAW_SERVICE_URL}?target=ordin&MST={search_result['mst']}&type=HTML",
     }
 
 

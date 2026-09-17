@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-from law_lookup import search_ordinance_mst, fetch_ordinance_xml, LAW_SERVICE_URL, DEFAULT_OC  # noqa: E402
+from law_lookup import search_ordinance_mst, fetch_ordinance_xml, LAW_SERVICE_URL  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_PATH = os.path.join(BASE_DIR, "data", "setback_table_draft.csv")
@@ -71,7 +71,9 @@ def collect_one(sgg_nm):
     except Exception as e:
         return ordinance_name, [], f"조례 원문 조회/파싱 실패: {e}"
 
-    source_url = f"{LAW_SERVICE_URL}?OC={DEFAULT_OC}&target=ordin&MST={mst}&type=HTML"
+    # OC는 개인 접근키이므로 draft CSV에 저장되는 URL에는 절대 포함하지 않는다(I6) -
+    # 이 CSV는 사람이 setback_table.csv로 옮기고, 웹앱이 출처로 그대로 노출한다.
+    source_url = f"{LAW_SERVICE_URL}?target=ordin&MST={mst}&type=HTML"
 
     found = []
     for jo in root.findall(".//조문/조"):

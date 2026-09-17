@@ -33,7 +33,7 @@ try:
     from judge import judge  # noqa: E402
     from match_regulations import match_regulations  # noqa: E402
     from query_site_data import query_site  # noqa: E402
-    from setback_check import check_setback, to_judgment_row  # noqa: E402
+    from setback_check import check_setback, to_judgment_row, unevaluated_judgment_row  # noqa: E402
 except Exception as e:
     IMPORT_ERROR = {
         "type": f"{type(e).__name__}: {e}",
@@ -59,24 +59,12 @@ def _judge_setback(eum_result: dict, project_type: str, exemptions: list, apply_
     """
     sgg_cd = eum_result.get("sgg_cd")
     if not sgg_cd:
-        return {
-            "raw_text": "이격거리(조례)",
-            "rule_id": "SETBACK-미검토",
-            "status": "판정불가",
-            "law_excerpt": None,
-            "source_url": None,
-            "note": "시군구코드를 확인할 수 없어 이격거리 조례를 검토하지 못함 - 해당 주소가 GIS "
-                    "폴백 조회 가능 지역(현재 전남만 지원) 밖일 수 있음 - 사람 확인 필요",
-        }
+        return unevaluated_judgment_row(
+            "시군구코드를 확인할 수 없어 이격거리 조례를 검토하지 못함 - 해당 주소가 GIS "
+            "폴백 조회 가능 지역(현재 전남만 지원) 밖일 수 있음 - 사람 확인 필요"
+        )
     if not os.path.isfile(SETBACK_TABLE_PATH):
-        return {
-            "raw_text": "이격거리(조례)",
-            "rule_id": "SETBACK-미검토",
-            "status": "판정불가",
-            "law_excerpt": None,
-            "source_url": None,
-            "note": "이격거리 조례 표 파일을 찾을 수 없어 검토하지 못함 - 사람 확인 필요",
-        }
+        return unevaluated_judgment_row("이격거리 조례 표 파일을 찾을 수 없어 검토하지 못함 - 사람 확인 필요")
 
     try:
         apply_date = date.fromisoformat(apply_date_str) if apply_date_str else date.today()
