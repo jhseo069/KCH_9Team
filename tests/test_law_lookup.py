@@ -134,3 +134,14 @@ def test_extract_article_parts_splits_branch_number():
     assert extract_article_parts("제27조의3") == ("27", "3")
     assert extract_article_parts("제76조") == ("76", None)
     assert extract_article_parts("별표20") is None
+
+
+def test_parse_article_skips_branch_article_even_when_it_comes_first():
+    """역순 배치에서도 가지번호를 건너뛰고 기본 조문을 반환해야 한다.
+    제80조의2가 제80조보다 먼저 나오는 픽스처에서 제80조를 요청하면
+    제80조의2를 스킵하고 제80조를 반환해야 한다."""
+    result = parse_article(FIXTURE, "80")
+
+    assert result["article_title"] == "역순 테스트용 제80조 제목"
+    assert "제80조의2의 내용" not in result["text"]
+    assert "제80조의 내용이며" in result["text"]
