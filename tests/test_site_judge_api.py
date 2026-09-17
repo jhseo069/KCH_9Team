@@ -33,3 +33,19 @@ def test_config_never_exposes_the_secret_key(monkeypatch):
     config = api.build_config()
 
     assert "super-secret-value" not in str(config)
+
+
+def test_coordinates_alone_are_enough_to_judge():
+    """지도 클릭은 주소 문자열 없이 좌표만 보낸다. 주소를 필수로 두면 클릭 판정이 막힌다."""
+    api = load_api()
+
+    assert api.missing_input_reason({"lon": ["126.4"], "lat": ["34.8"]}) is None
+
+
+def test_request_without_address_and_without_coordinates_is_rejected():
+    api = load_api()
+
+    reason = api.missing_input_reason({})
+
+    assert reason is not None
+    assert "주소" in reason

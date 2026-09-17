@@ -63,6 +63,19 @@ def build_config() -> dict:
     }
 
 
+def missing_input_reason(query: dict):
+    """판정에 필요한 입력이 없으면 사유를, 있으면 None을 돌려준다.
+
+    지도 클릭은 주소 문자열 없이 좌표만 보낸다. 주소를 필수로 두면 클릭 판정이 막힌다.
+    """
+    address = (query.get("address") or [""])[0].strip()
+    lon = (query.get("lon") or [""])[0].strip()
+    lat = (query.get("lat") or [""])[0].strip()
+    if address or (lon and lat):
+        return None
+    return "주소 또는 좌표(lon/lat)가 필요합니다"
+
+
 def _judge_setback(eum_result: dict, project_type: str, exemptions: list, apply_date_str: str) -> dict:
     """이격거리 판정 행을 만든다.
 
@@ -151,8 +164,9 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"error": "import_failed", "detail": IMPORT_ERROR}, status=500)
             return
 
-        if not address:
-            self._send_json({"error": "address 파라미터가 필요합니다"}, status=400)
+        reason = missing_input_reason(query)
+        if reason:
+            self._send_json({"error": reason}, status=400)
             return
 
         # 브라우저가 브이월드 지오코더를 JSONP로 직접 호출해서 얻은 좌표를 넘겨준 경우

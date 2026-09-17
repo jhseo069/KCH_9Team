@@ -320,6 +320,165 @@
       }).join("");
   }
   renderLegend();
+
+  const panelRight = document.getElementById("panel-right");
+  const msgEl = document.getElementById("form-msg");
+  let lastData = null;
+
+  document.getElementById("tab-bar").addEventListener("click", function (e) {
+    const btn = e.target.closest("button[data-tab]");
+    if (btn) switchTab(btn.dataset.tab);
+  });
+
+  function switchTab(name) {
+    document.querySelectorAll("#tab-bar button").forEach(function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    });
+    document.querySelectorAll(".tabpane").forEach(function (p) {
+      p.classList.toggle("on", p.id === "tab-" + name);
+    });
+    if (name === "법령" && typeof loadLawTab === "function") loadLawTab();
+  }
+
+  // 지도 클릭 = 그 좌표로 판정. 주소를 몰라도 검토할 수 있어야 한다.
+  leafletMap.on("click", function (e) {
+    judge(e.latlng.lng, e.latlng.lat, "지도에서 선택한 지점");
+  });
+
+  document.getElementById("addr-search").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const address = document.getElementById("address").value.trim();
+    if (!address) return;
+    msgEl.textContent = "좌표 변환 중...";
+    const geo = await geocodeJsonp(address);
+    if (!geo.ok) { msgEl.textContent = "주소 조회 실패: " + geo.reason; return; }
+    leafletMap.setView([geo.lat, geo.lon], 17);
+    judge(geo.lon, geo.lat, geo.refined_addr || address);
+  });
+
+  document.getElementById("judge-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!markerLayer) { msgEl.textContent = "먼저 주소를 검색하거나 지도를 클릭하세요."; return; }
+    const ll = markerLayer.getLatLng();
+    judge(ll.lng, ll.lat, document.getElementById("address").value.trim() || "지도에서 선택한 지점");
+  });
+
+  async function judge(lon, lat, label) {
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+    msgEl.textContent = "용도지역 조회 → 규제 매칭 → 판정 중...";
+
+    if (markerLayer) leafletMap.removeLayer(markerLayer);
+    markerLayer = L.marker([lat, lon]).addTo(leafletMap);
+
+    const params = new URLSearchParams({
+      address: label === "지도에서 선택한 지점" ? "" : label,
+      refined_addr: label,
+      project_type: document.getElementById("project_type").value,
+      capacity_kw: document.getElementById("capacity_kw").value || "0",
+      lon: lon, lat: lat,
+      exemptions: Array.from(document.querySelectorAll(".exemption:checked"))
+        .map(function (el) { return el.value; }).join(","),
+      apply_date: document.getElementById("apply_date").value,
+    });
+
+    try {
+      const res = await fetch("/api/site_judge?" + params.toString());
+      const data = await res.json();
+      if (!res.ok || data.error) { msgEl.textContent = "오류: " + (data.error || res.status); return; }
+      lastData = data;
+      renderResult(data, label);
+      msgEl.textContent = "";
+    } catch (err) {
+      msgEl.textContent = "요청 실패: " + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderResult(data, label) {
+    panelRight.hidden = false;
+    const eum = data.eum || {};
+    const zones = eum.zone_national_law || [];
+    document.getElementById("result-head").innerHTML =
+      escapeHtml(label) + '<span class="zone">' + escapeHtml(zones[0] || "용도지역 미확인") + "</span>";
+
+    // 선택 지점의 용도지역 경계. 이것도 표시용이다.
+    if (zoneOutlineLayer) { leafletMap.removeLayer(zoneOutlineLayer); zoneOutlineLayer = null; }
+    if (eum.zone_geometry) {
+      zoneOutlineLayer = L.geoJSON(eum.zone_geometry, {
+        style: { color: "#1b2030", weight: 3, dashArray: "6 4", fill: false },
+      }).addTo(leafletMap);
+    }
+
+    renderDiagnosis(data);
+    renderParcel(data, label);
+    renderSetback(data);
+    document.getElementById("tab-법령").innerHTML = '<p class="foot">탭을 열면 조문을 불러옵니다.</p>';
+    switchTab("진단");
+  }
+
+  function renderDiagnosis(data) {
+    const el = document.getElementById("tab-진단");
+    if (data.note) {
+      el.innerHTML = '<div class="note">' + escapeHtml(data.note) + "</div>" +
+        '<p class="foot">※ 확실하지 않으면 "비저촉"으로 단정하지 않고 사람 확인을 요구합니다.</p>';
+      return;
+    }
+    if (!data.table || !data.table.length) {
+      el.innerHTML = '<p class="foot">걸리는 규제 항목을 찾지 못했습니다 (규칙표 미등록 가능성 — 사람 확인 권장).</p>';
+      return;
+    }
+    el.innerHTML = "<table><thead><tr><th>항목</th><th>판정</th><th>비고</th></tr></thead><tbody>" +
+      data.table.map(function (r) {
+        return "<tr><td>" + escapeHtml(r["항목"] || "") + "</td>" +
+          '<td class="status-' + escapeHtml(r["판정"] || "") + '">' + escapeHtml(r["판정"] || "") + "</td>" +
+          "<td>" + escapeHtml(r["비고"] || "") + "</td></tr>";
+      }).join("") + "</tbody></table>" +
+      '<p class="foot">※ "조건부"/"판정불가"는 사람 검토가 필요합니다. 조문 원문은 법령 탭에 있습니다.</p>';
+  }
+
+  function renderParcel(data, label) {
+    const eum = data.eum || {}, v = data.vworld || {};
+    const rows = [
+      ["주소", label],
+      ["용도지역", (eum.zone_national_law || []).join(", ") || "-"],
+      ["시군구", (eum.sgg_nm || "-") + " (" + (eum.sgg_cd || "-") + ")"],
+      ["지목", eum.jimok_code || "미제공"],
+      ["면적", eum.area_sqm || "미제공"],
+      ["좌표", v.lon ? v.lon.toFixed(6) + ", " + v.lat.toFixed(6) : "-"],
+      ["조회 경로", eum.source === "gis" ? "용도지역 DB (GIS)" : "토지이음"],
+    ];
+    document.getElementById("tab-필지").innerHTML = "<dl>" + rows.map(function (r) {
+      return "<div><dt>" + escapeHtml(r[0]) + "</dt><dd>" + escapeHtml(String(r[1])) + "</dd></div>";
+    }).join("") + "</dl>" +
+      '<p class="foot">지목·면적은 토지이음 조회가 성공한 경우에만 표시됩니다.</p>';
+  }
+
+  function renderSetback(data) {
+    const row = (data.table || []).find(function (r) {
+      return (r["항목"] || "").indexOf("이격") >= 0;
+    });
+    const el = document.getElementById("tab-이격");
+    if (!row) {
+      el.innerHTML = '<p class="foot">이격거리 항목이 판정표에 없습니다.</p>';
+      return;
+    }
+    el.innerHTML = "<dl>" +
+      '<div><dt>판정</dt><dd class="status-' + escapeHtml(row["판정"] || "") + '">' +
+      escapeHtml(row["판정"] || "") + "</dd></div>" +
+      "<div><dt>근거</dt><dd>" + escapeHtml(row["근거조문"] || "-") + "</dd></div>" +
+      "</dl>" +
+      '<p class="foot">' + escapeHtml(row["비고"] || "") + "</p>" +
+      (row["출처"] ? '<p class="foot"><a href="' + escapeAttr(row["출처"]) + '" target="_blank">조례 원문</a></p>' : "");
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+  function escapeAttr(text) { return String(text == null ? "" : text).replace(/"/g, "&quot;"); }
 </script>
 </body>
 </html>
