@@ -12,6 +12,7 @@ query_site_data.resolve_zone_info()가 자동으로 GIS 좌표 기반 조회(현
 import json
 import os
 import sys
+from datetime import date
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -32,6 +33,7 @@ try:
     from judge import judge  # noqa: E402
     from match_regulations import match_regulations  # noqa: E402
     from query_site_data import query_site  # noqa: E402
+    from setback_check import check_setback, to_judgment_row  # noqa: E402
 except Exception as e:
     IMPORT_ERROR = {
         "type": f"{type(e).__name__}: {e}",
@@ -44,7 +46,57 @@ except Exception as e:
     }
 
 
-def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_result: dict = None) -> dict:
+SETBACK_TABLE_PATH = os.path.join(DATA_DIR, "setback_table.csv")
+
+
+def _judge_setback(eum_result: dict, project_type: str, exemptions: list, apply_date_str: str) -> dict:
+    """이격거리 판정 행을 만든다.
+
+    시군구코드를 모르거나(전남 밖 등 GIS 폴백이 안 된 경우) 조례 표 파일이 없어서
+    실제로 판정을 실행할 수 없는 경우에도, 행 자체는 항상 돌려준다. 판정표에서 행이
+    통째로 빠지면 "검토했는데 문제없음"과 "애초에 검토를 안 함"을 사용자가 구분할
+    수 없기 때문이다 - 누락 대신 명시적인 판정불가 행("SETBACK-미검토")을 낸다.
+    """
+    sgg_cd = eum_result.get("sgg_cd")
+    if not sgg_cd:
+        return {
+            "raw_text": "이격거리(조례)",
+            "rule_id": "SETBACK-미검토",
+            "status": "판정불가",
+            "law_excerpt": None,
+            "source_url": None,
+            "note": "시군구코드를 확인할 수 없어 이격거리 조례를 검토하지 못함 - 해당 주소가 GIS "
+                    "폴백 조회 가능 지역(현재 전남만 지원) 밖일 수 있음 - 사람 확인 필요",
+        }
+    if not os.path.isfile(SETBACK_TABLE_PATH):
+        return {
+            "raw_text": "이격거리(조례)",
+            "rule_id": "SETBACK-미검토",
+            "status": "판정불가",
+            "law_excerpt": None,
+            "source_url": None,
+            "note": "이격거리 조례 표 파일을 찾을 수 없어 검토하지 못함 - 사람 확인 필요",
+        }
+
+    try:
+        apply_date = date.fromisoformat(apply_date_str) if apply_date_str else date.today()
+    except ValueError:
+        apply_date = date.today()
+
+    setback_table = pd.read_csv(SETBACK_TABLE_PATH, dtype=str).fillna("")
+    result = check_setback(
+        sgg_cd=sgg_cd,
+        project_type=project_type,
+        apply_date=apply_date,
+        exemptions=exemptions or [],
+        zone_flags=None,   # 보호구역 자동 판별은 아직 없다 -> R6(판정불가)
+        setback_table=setback_table,
+    )
+    return to_judgment_row(result)
+
+
+def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_result: dict = None,
+                  exemptions: list = None, apply_date_str: str = "") -> dict:
     raw = query_site(address, project_type, capacity_kw, vworld_result=vworld_result)
     eum_result = raw.get("eum") or {}
 
@@ -65,6 +117,10 @@ def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_res
     rule_table = pd.read_csv(RULE_TABLE_PATH, dtype=str).fillna("")
     matching = match_regulations(eum_result, rule_table)
     judged = judge(matching, rule_table, {"capacity_kw": capacity_kw})
+
+    setback_row = _judge_setback(eum_result, project_type, exemptions, apply_date_str)
+    judged.append(setback_row)
+
     df = generate_output_table(judged)
     response["table"] = df.to_dict(orient="records")
     return response
@@ -86,6 +142,8 @@ class handler(BaseHTTPRequestHandler):
             capacity_kw = float((query.get("capacity_kw") or ["0"])[0])
         except ValueError:
             capacity_kw = 0.0
+        exemptions = [s for s in (query.get("exemptions") or [""])[0].split(",") if s]
+        apply_date_str = (query.get("apply_date") or [""])[0].strip()
 
         if IMPORT_ERROR is not None:
             self._send_json({"error": "import_failed", "detail": IMPORT_ERROR}, status=500)
@@ -114,7 +172,9 @@ class handler(BaseHTTPRequestHandler):
                 vworld_result = None
 
         try:
-            result = run_pipeline(address, project_type, capacity_kw, vworld_result=vworld_result)
+            result = run_pipeline(address, project_type, capacity_kw,
+                                   vworld_result=vworld_result,
+                                   exemptions=exemptions, apply_date_str=apply_date_str)
             self._send_json(result)
         except Exception as e:
             self._send_json({"error": f"{type(e).__name__}: {e}"}, status=500)

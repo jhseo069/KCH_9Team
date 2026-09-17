@@ -59,6 +59,20 @@
           <input id="capacity_kw" type="number" min="0" step="0.1" placeholder="예: 990">
         </div>
       </div>
+      <label>해당하는 경우 선택 (법 제27조의3제3항 — 이격거리 적용 배제)</label>
+      <div class="row" style="gap:16px;flex-wrap:wrap">
+        <label style="flex:none;color:var(--ink);margin:0">
+          <input type="checkbox" class="exemption" value="주민참여형" style="width:auto"> 주민참여형
+        </label>
+        <label style="flex:none;color:var(--ink);margin:0">
+          <input type="checkbox" class="exemption" value="지붕형" style="width:auto"> 지붕형
+        </label>
+        <label style="flex:none;color:var(--ink);margin:0">
+          <input type="checkbox" class="exemption" value="자가소비용" style="width:auto"> 자가소비용
+        </label>
+      </div>
+      <label for="apply_date">개발행위허가 신청 예정일</label>
+      <input id="apply_date" type="date">
       <button type="submit" id="submit-btn">판정표 만들기</button>
     </form>
     <p class="msg" id="form-msg"></p>
@@ -153,6 +167,9 @@
     const address = document.getElementById("address").value.trim();
     const projectType = document.getElementById("project_type").value;
     const capacityKw = document.getElementById("capacity_kw").value || "0";
+    const exemptions = Array.from(document.querySelectorAll(".exemption:checked"))
+      .map(function (el) { return el.value; }).join(",");
+    const applyDate = document.getElementById("apply_date").value;
 
     btnEl.disabled = true;
     msgEl.textContent = "좌표 변환 중... (브라우저에서 직접 조회)";
@@ -170,7 +187,9 @@
         "&project_type=" + encodeURIComponent(projectType) +
         "&capacity_kw=" + encodeURIComponent(capacityKw) +
         "&lon=" + geo.lon + "&lat=" + geo.lat +
-        "&refined_addr=" + encodeURIComponent(geo.refined_addr);
+        "&refined_addr=" + encodeURIComponent(geo.refined_addr) +
+        "&exemptions=" + encodeURIComponent(exemptions) +
+        "&apply_date=" + encodeURIComponent(applyDate);
       const res = await fetch(url);
       const data = await res.json();
 
