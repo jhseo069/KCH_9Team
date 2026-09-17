@@ -78,12 +78,15 @@ def missing_input_reason(query: dict):
 
 
 def route_for(path: str) -> str:
-    """요청 경로 -> 처리 이름.
+    """요청 경로(쿼리스트링 포함) -> 처리 이름.
 
     이 Vercel 프로젝트는 api/ 에 handler 파일을 하나만 둘 수 있어서(pyproject.toml의
-    entrypoint로 고정) 엔드포인트를 파일로 늘릴 수 없다. 경로로 분기한다.
+    entrypoint로 고정) 엔드포인트를 파일로 늘릴 수 없다. Vercel의 제로 설정 Python
+    빌더는 api/site_judge.py를 URL /api/site_judge 하나에만 매핑하므로(하위 경로는
+    404) 서브패스가 아니라 쿼리 파라미터(law=1)로 분기한다. 값이 아니라 파라미터
+    존재 자체로 판단하므로 address=law 같은 값은 걸리지 않는다.
     """
-    return "law" if urlparse(path).path.rstrip("/").endswith("/law") else "judge"
+    return "law" if "law" in parse_qs(urlparse(path).query) else "judge"
 
 
 def fetch_law(query: dict) -> dict:

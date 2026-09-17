@@ -51,12 +51,22 @@ def test_request_without_address_and_without_coordinates_is_rejected():
     assert "주소" in reason
 
 
-def test_law_path_is_routed_to_the_law_handler():
+def test_law_query_param_is_routed_to_the_law_handler():
+    """Vercel의 제로 설정 Python 빌더는 /api/site_judge 로만 매핑한다 - 서브패스(/law)는
+    404가 되므로 쿼리 파라미터로 분기해야 실제 배포에서 동작한다."""
     api = load_api()
 
-    assert api.route_for("/api/site_judge/law?law_name=x") == "law"
+    assert api.route_for("/api/site_judge?law=1&law_name=x") == "law"
     assert api.route_for("/api/site_judge?address=x") == "judge"
     assert api.route_for("/api/site_judge") == "judge"
+
+
+def test_address_value_containing_the_text_law_still_routes_to_judge():
+    """law 파라미터의 '값'이 아니라 '존재'로 분기해야 한다 - 주소에 law라는 문자열이
+    섞여 있어도(예: 부분 문자열 매칭이었다면 오분기했을 케이스) judge로 가야 한다."""
+    api = load_api()
+
+    assert api.route_for("/api/site_judge?address=law") == "judge"
 
 
 def test_law_lookup_returns_article_text(monkeypatch):

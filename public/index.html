@@ -167,6 +167,7 @@
   let leafletMap = null, tileLayer = null, zoningLayer = null;
   let markerLayer = null, zoneOutlineLayer = null;
   let zoningRequestId = 0;
+  let judgeRequestId = 0;
 
   const noticeEl = document.getElementById("map-notice");
   function notice(text) {
@@ -291,7 +292,7 @@
         const color = categoryColor(row.zone_category);
         return L.geoJSON(JSON.parse(row.geojson), {
           style: { color: color, weight: 1, fillColor: color, fillOpacity: 0.35 },
-        }).bindTooltip(row.zone_name, { sticky: true });
+        }).bindTooltip(escapeHtml(row.zone_name), { sticky: true });
       })).addTo(leafletMap);
 
       // 3,000건에서 잘렸을 수 있다. 조용히 자르면 사용자가 빈 곳을 보고
@@ -364,6 +365,7 @@
   });
 
   async function judge(lon, lat, label) {
+    const myId = ++judgeRequestId;   // 느린 응답이 나중에 도착해 더 최신 지점 결과를 덮어쓰는 것을 막는다
     const btn = document.getElementById("submit-btn");
     btn.disabled = true;
     msgEl.textContent = "용도지역 조회 → 규제 매칭 → 판정 중...";
@@ -385,14 +387,16 @@
     try {
       const res = await fetch("/api/site_judge?" + params.toString());
       const data = await res.json();
+      if (myId !== judgeRequestId) return;   // 더 새로운 판정 요청이 진행 중
       if (!res.ok || data.error) { msgEl.textContent = "오류: " + (data.error || res.status); return; }
       lastData = data;
       renderResult(data, label);
       msgEl.textContent = "";
     } catch (err) {
+      if (myId !== judgeRequestId) return;
       msgEl.textContent = "요청 실패: " + err.message;
     } finally {
-      btn.disabled = false;
+      if (myId === judgeRequestId) btn.disabled = false;
     }
   }
 
@@ -479,7 +483,7 @@
       "<div><dt>근거</dt><dd>" + escapeHtml(row["근거조문"] || "-") + "</dd></div>" +
       "</dl>" +
       '<p class="foot">' + escapeHtml(row["비고"] || "") + "</p>" +
-      (row["출처"] ? '<p class="foot"><a href="' + escapeAttr(row["출처"]) + '" target="_blank">조례 원문</a></p>' : "");
+      (safeHref(row["출처"]) ? '<p class="foot"><a href="' + safeHref(row["출처"]) + '" target="_blank">조례 원문</a></p>' : "");
   }
 
   // 판정표의 '항목'에서 법령명과 조문을 뽑는다. rule_table.csv의 law_name/law_article이
@@ -511,7 +515,7 @@
     el.innerHTML = '<p class="foot">조문을 불러오는 중...</p>';
     const parts = await Promise.all(targets.map(async function (t) {
       try {
-        const res = await fetch("/api/site_judge/law?law_name=" + encodeURIComponent(t.law_name) +
+        const res = await fetch("/api/site_judge?law=1&law_name=" + encodeURIComponent(t.law_name) +
                                 "&law_article=" + encodeURIComponent(t.law_article));
         const d = await res.json();
         if (d.status !== "ok") {
@@ -522,7 +526,7 @@
                " " + escapeHtml(d.article_title || "") + "</h4>" +
                "<pre>" + escapeHtml(d.text || "") + "</pre>" +
                '<p class="foot">시행 ' + escapeHtml(d.effective_date || "-") +
-               (d.source_url ? ' · <a href="' + escapeAttr(d.source_url) + '" target="_blank">원문</a>' : "") +
+               (safeHref(d.source_url) ? ' · <a href="' + safeHref(d.source_url) + '" target="_blank">원문</a>' : "") +
                "</p></div>";
       } catch (e) {
         return '<div class="lawitem"><h4>' + escapeHtml(t.law_name + " " + t.law_article) +
@@ -539,6 +543,15 @@
     });
   }
   function escapeAttr(text) { return String(text == null ? "" : text).replace(/"/g, "&quot;"); }
+
+  // href에 넣기 전에 스킴을 제한한다 - escapeAttr는 따옴표만 이스케이프할 뿐 javascript:
+  // 같은 스킴은 그대로 통과시키므로, 링크를 실제로 그릴지 여부는 별도로 판단해야 한다.
+  // 이격 탭의 출처(setback_table.csv, 사람이 직접 편집)와 법령 탭의 source_url 모두
+  // 이 검사를 거친 뒤에만 <a href>로 렌더링한다.
+  function safeHref(url) {
+    const s = String(url == null ? "" : url);
+    return /^https?:\/\//i.test(s) ? escapeAttr(s) : "";
+  }
 </script>
 </body>
 </html>
