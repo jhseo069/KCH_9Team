@@ -12,3 +12,4 @@ Vercel에 배포되는 정적 프론트엔드 파일. 신재생사업본부 팀�
 ## 폴더 내 파일
 - `index.html`: 메인 페이지. 부지 주소/사업 종류/용량을 입력하면 `/api/site_judge`를 호출해 판정표를 렌더링한다.
 - `guestbook.html`: 방명록 페이지 (강사 요구사항). Supabase 연동 — 상단의 `SUPABASE_URL`/`SUPABASE_KEY`를 채워야 동작한다. 비워두면 "연결 안 됨" 안내만 표시되고 앱은 정상 동작함(HANDOVER.md 참고).
+- `map_utils.js`: 지도 표시용 순수 함수(줌별 단순화 강도, 용도지역 색 매핑).

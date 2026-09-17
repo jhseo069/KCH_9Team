@@ -421,7 +421,16 @@
   function renderDiagnosis(data) {
     const el = document.getElementById("tab-진단");
     if (data.note) {
-      el.innerHTML = '<div class="note">' + escapeHtml(data.note) + "</div>" +
+      let extra = "";
+      if (data.note.indexOf("용도지역 DB") >= 0) {
+        // zone_db.ZoneDbUnavailable 계열. 조회를 못 한 것이지 없는 것이 아니다.
+        extra = '<p class="foot">용도지역 데이터베이스에 연결하지 못했습니다. ' +
+                '잠시 후 다시 시도해 주세요 — 한동안 사용이 없으면 자동으로 멈췄다가 다시 깨어납니다.</p>';
+      } else if (data.note.indexOf("폴리곤이 없음") >= 0) {
+        extra = '<p class="foot">현재 용도지역 데이터는 전남 22개 시군만 있습니다. ' +
+                '그 밖의 지역은 조회되지 않습니다.</p>';
+      }
+      el.innerHTML = '<div class="note">' + escapeHtml(data.note) + "</div>" + extra +
         '<p class="foot">※ 확실하지 않으면 "비저촉"으로 단정하지 않고 사람 확인을 요구합니다.</p>';
       return;
     }
