@@ -61,3 +61,12 @@ def test_eum_failed_and_no_coordinates_returns_eum_unchanged():
     result = resolve_zone_info(vworld_result, eum_result, geojson_path=ZONING_FIXTURE)
 
     assert result is eum_result
+
+
+def test_gis_fallback_passes_sgg_cd_for_setback_check():
+    eum_result = {"status": "no_data", "reason": "빈 응답"}
+    vworld_result = {"status": "ok", "lon": POINT_INSIDE["lon"], "lat": POINT_INSIDE["lat"]}
+
+    result = resolve_zone_info(vworld_result, eum_result, geojson_path=ZONING_FIXTURE)
+
+    assert result["sgg_cd"] == "12110"

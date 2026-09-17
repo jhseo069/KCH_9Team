@@ -1,5 +1,5 @@
 """
-[5단계] 출력 생성: 판정 결과를 4열 판정표(CSV/XLSX)와 사람 검토 목록으로 내보낸다.
+[5단계] 출력 생성: 판정 결과를 5열 판정표(CSV/XLSX)와 사람 검토 목록으로 내보낸다.
 
 To-Be 설계서 [5]단계 / PRD FR-5 구현.
 """
@@ -15,14 +15,20 @@ HUMAN_REVIEW_STATUSES = {"판정불가", "조건부"}
 
 
 def generate_output_table(judgment_result: list[dict]) -> pd.DataFrame:
-    """항목 | 판정 | 근거조문 | 출처 4열 DataFrame 반환"""
+    """항목 | 판정 | 근거조문 | 출처 | 비고 5열 DataFrame 반환.
+
+    비고는 item["note"]를 그대로 옮긴다 - 판정불가/조건부인 이유(예: 시군구코드 미확인,
+    조례 표 파일 없음, 판정 기준일 등)가 판정 자체(항목/판정)만 봐서는 드러나지 않으면
+    사람이 다음 행동을 정할 수 없기 때문이다. note가 없는 행은 빈 값(None)으로 둔다.
+    """
     rows = [{
         "항목": item["raw_text"],
         "판정": item["status"],
         "근거조문": item.get("law_excerpt"),
         "출처": item.get("source_url"),
+        "비고": item.get("note"),
     } for item in judgment_result]
-    return pd.DataFrame(rows, columns=["항목", "판정", "근거조문", "출처"])
+    return pd.DataFrame(rows, columns=["항목", "판정", "근거조문", "출처", "비고"])
 
 
 def export_outputs(df: pd.DataFrame, judgment_result: list[dict], out_dir: Path) -> None:

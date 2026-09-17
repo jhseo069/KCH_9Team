@@ -94,6 +94,35 @@ if __name__ == "__main__":
 
     result = judge(matching_result, rule_table, observed_values)
 
+    # FR-10. 이격거리 규정 판정을 같은 판정표에 한 행으로 덧붙인다.
+    # 판정을 아예 실행할 수 없는 경우(시군구코드 미확인, 조례 표 파일 없음)에도 행을
+    # 조용히 빠뜨리지 않는다(I5) - api/site_judge.py(웹앱)와 같은 공용 폴백을 쓴다.
+    from setback_check import check_setback, to_judgment_row, unevaluated_judgment_row
+
+    setback_path = BASE_DIR / "data" / "setback_table.csv"
+    sgg_cd = raw_query_result.get("eum", {}).get("sgg_cd") if raw_query_path.exists() else None
+    if not sgg_cd:
+        result.append(unevaluated_judgment_row(
+            "시군구코드를 확인할 수 없어 이격거리 조례를 검토하지 못함 - 사람 확인 필요"
+        ))
+    elif not setback_path.exists():
+        result.append(unevaluated_judgment_row(
+            "이격거리 조례 표 파일을 찾을 수 없어 검토하지 못함 - 사람 확인 필요"
+        ))
+    else:
+        from datetime import date
+
+        setback_table = pd.read_csv(setback_path, dtype=str).fillna("")
+        setback_result = check_setback(
+            sgg_cd=sgg_cd,
+            project_type=raw_query_result.get("input", {}).get("project_type", ""),
+            apply_date=date.today(),
+            exemptions=[],       # CLI에서는 면제사유를 입력받지 않는다 (웹앱에서만 지원)
+            zone_flags=None,     # 보호구역 판별은 아직 자동화되지 않았다 -> R6(판정불가)
+            setback_table=setback_table,
+        )
+        result.append(to_judgment_row(setback_result))
+
     out_path = BASE_DIR / "data" / "judgment_result.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)

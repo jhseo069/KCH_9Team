@@ -213,6 +213,7 @@ def resolve_zone_info(vworld_result: dict, eum_result: dict, geojson_path=None) 
         "zone_other_law": [],
         "special_notice_raw": "",
         "sgg_nm": zone_result["sgg_nm"],
+        "sgg_cd": zone_result["sgg_cd"],
         "zone_geometry": zone_result["geometry"],
     }
 

@@ -24,7 +24,7 @@
 - `data/rule_table.csv`: 규칙표 (법령 개정 시 이 파일만 수정, 코드 수정 불필요)
 - `data/matching_result.json`: 규칙 매칭 스크립트 실행 결과
 - `data/judgment_result.json`: 판정 계산 스크립트 실행 결과
-- `src/export_output.py`: **[5단계] 출력 생성** 스크립트. 4열 판정표(CSV/XLSX) + 사람 검토 목록 생성
+- `src/export_output.py`: **[5단계] 출력 생성** 스크립트. 5열 판정표(항목/판정/근거조문/출처/비고, CSV/XLSX) + 사람 검토 목록 생성
 - `output/`: 최종 판정표(`final_table.csv/.xlsx`), 사람 검토 목록(`human_review_needed.csv`)
 - `src/law_lookup.py`: 국가법령정보센터 Open API로 법령 조문 원문 실시간 조회
 - `src/gis_lookup.py`: 좌표 → 용도지역 GIS 조회. eum.go.kr 개별 주소 조회가 클라우드에서 막혀있을 때 대체 경로로 쓰인다(HANDOVER.md §5-2). 전남 지역만 지원
@@ -54,4 +54,4 @@ python -m pytest -v                                           # 테스트 실행
 - 토지이음(eum.go.kr)은 공식 공개 API가 아니라 내부 화면용 AJAX(`mpSearchAddrAjaxXml.jsp`, `luLandDet.jsp`)를 그대로 사용한다. 사이트가 개편되면 `query_site_data.py`의 파싱 로직이 깨질 수 있다.
 - 짧은 시간에 요청을 반복하면 토지이음이 빈 응답(`{}`)을 돌려주는 현상을 확인했다(요청 빈도 제한으로 추정). 이 경우 스크립트는 `status: "no_data"`로 표시하고 사유를 남긴다. **주의:** 2026-09-09 개발 중 테스트를 과도하게 반복한 뒤 2026-09-16(1주일 후) 재확인했을 때도 여전히 빈 응답이 지속되는 것을 확인했다 — 단순 "잠시 후 재시도"로 풀리지 않는, 더 긴 기간의 IP 차단이거나 실습용 환경 특성일 가능성이 있다. 실사용 전 반드시 라이브로 재검증 필요(다른 네트워크/기간을 두고 재시도 권장). 어느 쪽이든 부지 여러 건을 연속 조회할 때는 호출 사이에 1~2초 이상 간격을 두는 것을 권장한다.
 - 브이월드는 주소 검색(Geocoder) API는 정상 동작하지만, 지적·토지특성정보 API(GetFeature, NED)는 현재 키에 `INCORRECT_KEY`가 발생한다 — 별도 활용신청 승인이 필요하다. 지목·면적은 토지이음 응답에서 함께 얻고 있어 당장은 문제 없다.
-- 국가법령정보센터(law.go.kr) Open API는 `OC=test`(비등록 데모 접근)로 정상 동작을 확인했지만, 실사용 시에는 `open.law.go.kr`에서 본인 이메일로 무료 등록한 OC로 `.env`의 `LAW_GO_KR_OC`를 채워 교체할 것을 권장한다.
+- 국가법령정보센터(law.go.kr) Open API는 정식 OC 키를 `.env`의 `LAW_GO_KR_OC`에 적용 완료. 다만 시행일자별 조회(`efYd` 파라미터)는 정식 키로도 동작하지 않는다.

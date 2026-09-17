@@ -12,3 +12,4 @@
 ## 폴더 내 파일
 - `build_zoning_geojson.py`: eum.go.kr 데이터개방에서 받은 전국 용도지역 SHP(`(도시계획)용도지역정보`, dataCd=004)의 전남·광주 통합 시도(12000) 구간을 잘라, 전남 22개 시군구만 남기고 WGS84 GeoJSON(`../data/zoning_jeonnam.geojson`)으로 변환한다. 원본 SHP(전국 976MB)는 용량 때문에 저장소에 커밋하지 않으므로, 데이터를 다시 받아 이 스크립트를 재실행하려면 `HANDOVER.md`의 "eum.go.kr 데이터개방 다운로드 절차"를 따라 원본을 내려받은 뒤 스크립트 상단 `SHP_PATH`를 실제 경로로 바꿔서 실행한다.
 - eum.go.kr이 이 데이터를 주기적으로 갱신하므로(고시·변경 반영), 정확도를 유지하려면 몇 달에 한 번씩 재실행을 권장한다.
+- `collect_setback_draft.py`: 전남 22개 시군구 도시계획 조례에서 이격거리 조문 초안을 수집해 `../data/setback_table_draft.csv`로 저장한다. 수집 결과는 `verified_by`가 비어 있는 **초안**이며, 사람이 조문을 읽고 수치를 확정해 `../data/setback_table.csv`로 옮겨야 판정에 반영된다.
