@@ -138,16 +138,24 @@ def eum_resolve_pnu(keyword: str, session: requests.Session) -> dict:
         ("jibunList", ["pnu", "fullStr", "bonbun", "bubun"]),
         ("roadList", ["pnu", "fullStr", "bdbonbun", "bdbubun"]),
     ]
+    found_nodes_without_pnu = False
     for key, fields in sources:
         nodes = _parse_node_list(data.get(key), fields)
+        usable_nodes = [n for n in nodes if n.get("pnu")]
+        if usable_nodes:
+            return {"status": "ok", "pnu": usable_nodes[0]["pnu"], "matched_from": key, "candidates": usable_nodes}
         if nodes:
-            return {"status": "ok", "pnu": nodes[0]["pnu"], "matched_from": key, "candidates": nodes}
+            found_nodes_without_pnu = True
 
+    if found_nodes_without_pnu:
+        return {"status": "no_data", "reason": "조회 결과에 필지고유번호(PNU)가 없어 사용할 수 없습니다"}
     return {"status": "no_data", "reason": "일치하는 주소를 찾을 수 없습니다"}
 
 
 def eum_get_land_detail(pnu: str, session: requests.Session) -> dict:
     """PNU로 토지이용계획 상세(지목·면적·지역지구 규제 항목) 조회 및 파싱"""
+    if not pnu:
+        return {"status": "no_data", "reason": "PNU가 없어 상세 정보를 조회할 수 없습니다"}
     sgg_cd = pnu[2:5]
     payload = {
         "selGbn": "umd", "isNoScr": "", "s_type": "1", "mode": "search",
