@@ -9,8 +9,13 @@ LAW_GO_KR_OC로 오버라이드 가능).
 import os
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 LAW_SEARCH_URL = "https://www.law.go.kr/DRF/lawSearch.do"
 LAW_SERVICE_URL = "https://www.law.go.kr/DRF/lawService.do"
