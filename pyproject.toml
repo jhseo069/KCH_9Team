@@ -2,9 +2,11 @@
 name = "site-judge-automation"
 version = "0.1.0"
 requires-python = ">=3.12"
+# 배포(Vercel)에 실제로 필요한 것만 둔다. shapely/pyproj/pyshp는 용도지역 데이터를
+# 만들고 적재하는 scripts/ 에서만 쓰므로 여기 넣지 않는다 - GEOS 바이너리까지 딸려와
+# 번들만 무거워진다. 개발용 전체 목록은 requirements.txt 참고.
 dependencies = [
     "requests",
-    "shapely",
     "pandas",
     "beautifulsoup4",
     "lxml",
