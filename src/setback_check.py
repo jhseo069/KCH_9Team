@@ -70,6 +70,10 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
     확실하지 않으면 판정불가를 돌려준다 - 이 함수는 어떤 경우에도 '저촉'을 반환하지 않는다.
     반경 내 주택 실측이 범위 밖이라 저촉을 확정할 근거가 없기 때문이다.
 
+    반환값은 status/rule/reason/ordinance/statute와 함께 apply_date(판정에 사용한
+    기준일, ISO 문자열)를 모든 경로(R1 조기 반환 포함)에서 포함한다 - R4/R5 분기를
+    결정한 날짜가 결과에서 드러나지 않으면 사람이 판정 근거를 검증할 수 없기 때문이다.
+
     distance_m/min_house_count 셀의 빈 값과 파싱 불가 값은 의미가 다르다: 빈 셀은
     "사람이 확인한 결과 규정이 없음"(R3, 비저촉)이고, "약 100"처럼 숫자로 읽을 수
     없는 비어있지 않은 값은 확인되지 않은 데이터 오류(R2-b, 판정불가)다. 후자를
@@ -84,6 +88,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
                 "reason": f"법 {STATUTORY_EXEMPTIONS[name]}에 해당해 조례 이격거리가 적용되지 않음",
                 "ordinance": None,
                 "statute": STATUTE,
+                "apply_date": apply_date.isoformat(),
             }
 
     # R2. 사람이 확정한 조례 데이터가 없으면 판정하지 않는다
@@ -103,6 +108,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
             "reason": "해당 시군구의 조례 이격거리 규정이 아직 확인되지 않음 - 사람 확인 필요",
             "ordinance": None,
             "statute": STATUTE,
+            "apply_date": apply_date.isoformat(),
         }
 
     row = matched.iloc[0]
@@ -121,6 +127,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
                 "reason": f"{label} 값을 숫자로 해석할 수 없음: '{raw}' - 조례 표 데이터 확인 필요",
                 "ordinance": ordinance,
                 "statute": STATUTE,
+                "apply_date": apply_date.isoformat(),
             }
 
     # R3. 확인 결과 조례에 이격거리 규정 자체가 없는 경우
@@ -131,6 +138,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
             "reason": f"{ordinance['name']}에 이격거리 규정 없음 ({str(row['verified_at']).strip()} 확인)",
             "ordinance": ordinance,
             "statute": STATUTE,
+            "apply_date": apply_date.isoformat(),
         }
 
     # R4. 법 시행 전 신청분은 종전 조례가 그대로 적용된다 (부칙 제3조 적용례)
@@ -144,6 +152,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
             ),
             "ordinance": ordinance,
             "statute": STATUTE,
+            "apply_date": apply_date.isoformat(),
         }
 
     # R6. 보호구역 해당 여부를 모르면 R5 판단 자체가 불가능하다
@@ -154,6 +163,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
             "reason": "역사문화환경보존지역·생태경관보전지역 해당 여부를 확인할 수 없어 판단 불가 - 사람 확인 필요",
             "ordinance": ordinance,
             "statute": STATUTE,
+            "apply_date": apply_date.isoformat(),
         }
 
     # R5-a. 법 제1항 각 호에 해당하면 지자체가 이격거리를 적용할 수 있다
@@ -165,6 +175,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
                 "reason": f"법 {basis}에 해당해 조례 이격거리를 적용할 수 있음 - 실제 저촉 여부는 현장 확인 필요",
                 "ordinance": ordinance,
                 "statute": STATUTE,
+                "apply_date": apply_date.isoformat(),
             }
 
     # R5-b. 원칙적으로 적용 불가지만, 예외를 정할 대통령령이 아직 없다
@@ -178,11 +189,17 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
         ),
         "ordinance": ordinance,
         "statute": STATUTE,
+        "apply_date": apply_date.isoformat(),
     }
 
 
 def to_judgment_row(result):
-    """check_setback 결과를 기존 판정표 행 구조로 변환한다."""
+    """check_setback 결과를 기존 판정표 행 구조로 변환한다.
+
+    note 끝에 판정에 사용한 기준일(apply_date)을 덧붙인다 - 판정 결과(특히 R4/R5
+    분기)가 어떤 날짜를 기준으로 내려졌는지가 판정표만 봐서는 드러나지 않으면 안 되기
+    때문이다.
+    """
     ordinance = result.get("ordinance")
     if ordinance:
         excerpt = f"[{ordinance['name']} {ordinance['article']}] {ordinance['excerpt']}"
@@ -201,5 +218,5 @@ def to_judgment_row(result):
         "status": result["status"],
         "law_excerpt": law_excerpt,
         "source_url": source_url,
-        "note": result["reason"],
+        "note": f"{result['reason']} (판정 기준일: {result['apply_date']})",
     }

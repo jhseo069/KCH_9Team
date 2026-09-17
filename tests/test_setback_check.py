@@ -94,6 +94,7 @@ def test_application_before_statute_keeps_ordinance():
     assert result["status"] == "조건부"
     assert result["rule"] == "R4"
     assert result["ordinance"]["distance_m"] == 100
+    assert result["apply_date"] == BEFORE.isoformat()
 
 
 def test_protected_zone_allows_ordinance_after_statute():
@@ -111,6 +112,7 @@ def test_ordinary_zone_after_statute_is_undecidable_due_to_missing_decree():
     assert result["status"] == "판정불가"
     assert result["rule"] == "R5-b"
     assert "대통령령" in result["reason"]
+    assert result["apply_date"] == AFTER.isoformat()
 
 
 def test_unknown_zone_flags_are_undecidable():
@@ -136,3 +138,4 @@ def test_judgment_row_matches_existing_table_shape():
     assert row["status"] == "조건부"
     assert "목포시 도시계획 조례" in row["law_excerpt"]
     assert row["source_url"] == "https://www.law.go.kr/test"
+    assert f"판정 기준일: {BEFORE.isoformat()}" in row["note"]
