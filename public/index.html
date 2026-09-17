@@ -157,13 +157,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="/map_utils.js"></script>
 <script>
-  let cfg = { vworld_map_key: "", supabase_url: "", supabase_key: "" };
+  const { shouldLoadZoning, toleranceForZoom, categoryColor, ZONE_CATEGORIES } = window.MapUtils;
 
-  // 페이지 로드 시점에 지도/지오코딩용 브이월드 키를 미리 받아둔다.
+  // 전남 중심. 처음에는 줌 9로 전체를 보여준다(용도지역은 아직 안 칠해진다).
+  const JEONNAM_CENTER = [34.86, 126.99];
+  const MAX_ZONING_ROWS = 3000;
+
+  let cfg = { vworld_map_key: "", supabase_url: "", supabase_key: "" };
+  let leafletMap = null, tileLayer = null, zoningLayer = null;
+  let markerLayer = null, zoneOutlineLayer = null;
+  let zoningRequestId = 0;
+
+  const noticeEl = document.getElementById("map-notice");
+  function notice(text) {
+    if (!text) { noticeEl.hidden = true; return; }
+    noticeEl.textContent = text;
+    noticeEl.hidden = false;
+  }
+
+  leafletMap = L.map("map", { attributionControl: false }).setView(JEONNAM_CENTER, 9);
+  L.control.attribution({ prefix: false }).addTo(leafletMap)
+    .addAttribution("© VWorld, 국토교통부 · 용도지역: 토지이음");
+
   fetch("/api/site_judge?config=1")
-    .then(function (res) { return res.json(); })
-    .then(function (data) { cfg.vworld_map_key = (data && data.vworld_map_key) || ""; })
-    .catch(function () {});
+    .then(function (r) { return r.json(); })
+    .then(function (c) {
+      cfg = c;
+      if (cfg.vworld_map_key) {
+        tileLayer = L.tileLayer(
+          "https://api.vworld.kr/req/wmts/1.0.0/" + cfg.vworld_map_key + "/Satellite/{z}/{y}/{x}.jpeg",
+          { maxZoom: 19, tileSize: 256 }
+        ).addTo(leafletMap);
+      }
+      loadZoning();
+    })
+    .catch(function () { notice("지도 설정을 불러오지 못했습니다. 새로고침해 주세요."); });
 
   // 브이월드 지오코더 REST API는 서버(Vercel)에서 부르면 막히고, 브라우저에서 fetch로
   // 직접 부르면 CORS로 막힌다(HANDOVER.md §5-4/§5-5) - 그런데 JSONP(스크립트 태그로 불러오는
@@ -216,6 +244,82 @@
     if (road.ok) return road;
     return geocodeJsonpOnce(address, "parcel");
   }
+
+  // 화면 범위의 용도지역을 Supabase에서 직접 받아 칠한다.
+  // 여기서 받는 도형은 단순화된 표시용이다 - 판정에는 절대 쓰지 않는다(설계서 §4.4).
+  // 줌 12에서 단순화 오차가 55m까지 나므로, 경계 근처는 화면 색과 실제 판정이 다를 수 있다.
+  async function loadZoning() {
+    if (!document.getElementById("layer-zoning").checked) {
+      if (zoningLayer) { leafletMap.removeLayer(zoningLayer); zoningLayer = null; }
+      notice("");
+      return;
+    }
+    const zoom = leafletMap.getZoom();
+    if (!shouldLoadZoning(zoom)) {
+      if (zoningLayer) { leafletMap.removeLayer(zoningLayer); zoningLayer = null; }
+      notice("확대하면 용도지역이 표시됩니다");
+      return;
+    }
+    if (!cfg.supabase_url || !cfg.supabase_key) {
+      notice("용도지역 레이어를 불러오지 못했습니다 (설정 없음). 판정은 그대로 됩니다.");
+      return;
+    }
+
+    const myId = ++zoningRequestId;   // 지도를 빠르게 움직이면 늦게 온 응답이 최신을 덮어쓴다
+    const b = leafletMap.getBounds();
+    try {
+      const res = await fetch(cfg.supabase_url.replace(/\/$/, "") + "/rest/v1/rpc/zoning_in_bbox", {
+        method: "POST",
+        headers: {
+          "apikey": cfg.supabase_key,
+          "Authorization": "Bearer " + cfg.supabase_key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          min_lon: b.getWest(), min_lat: b.getSouth(),
+          max_lon: b.getEast(), max_lat: b.getNorth(),
+          tolerance: toleranceForZoom(zoom),
+          max_rows: MAX_ZONING_ROWS,
+        }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const rows = await res.json();
+      if (myId !== zoningRequestId) return;   // 더 새로운 요청이 진행 중
+
+      if (zoningLayer) leafletMap.removeLayer(zoningLayer);
+      zoningLayer = L.layerGroup(rows.map(function (row) {
+        const color = categoryColor(row.zone_category);
+        return L.geoJSON(JSON.parse(row.geojson), {
+          style: { color: color, weight: 1, fillColor: color, fillOpacity: 0.35 },
+        }).bindTooltip(row.zone_name, { sticky: true });
+      })).addTo(leafletMap);
+
+      // 3,000건에서 잘렸을 수 있다. 조용히 자르면 사용자가 빈 곳을 보고
+      // "용도지역이 없는 땅"으로 오해한다.
+      notice(rows.length >= MAX_ZONING_ROWS
+        ? "이 범위에는 표시할 수 있는 것보다 많은 구역이 있습니다 — 확대하세요" : "");
+    } catch (e) {
+      if (myId !== zoningRequestId) return;
+      // 레이어 실패가 판정을 막지 않는다. 둘은 다른 경로다.
+      notice("용도지역 레이어를 불러오지 못했습니다 (" + e.message + "). 판정은 그대로 됩니다.");
+    }
+  }
+
+  leafletMap.on("moveend", loadZoning);
+  document.getElementById("layer-zoning").addEventListener("change", loadZoning);
+  document.getElementById("layer-satellite").addEventListener("change", function () {
+    if (!tileLayer) return;
+    if (this.checked) tileLayer.addTo(leafletMap); else leafletMap.removeLayer(tileLayer);
+  });
+
+  function renderLegend() {
+    document.getElementById("legend").innerHTML =
+      "<b>용도지역</b>" + ZONE_CATEGORIES.map(function (c) {
+        return '<div class="item"><span class="sw" style="background:' + categoryColor(c) +
+               '"></span>' + c + "</div>";
+      }).join("");
+  }
+  renderLegend();
 </script>
 </body>
 </html>
