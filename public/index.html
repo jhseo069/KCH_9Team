@@ -6,45 +6,100 @@
 <title>사업 분석자동화</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-  :root{ --bg:#f6f7f9; --card:#fff; --ink:#1b2030; --muted:#5b6472; --line:#e6e8ee; --accent:#3f5bd9; }
+  :root{ --bg:#f6f7f9; --card:#fff; --ink:#1b2030; --muted:#5b6472; --line:#e6e8ee; --accent:#3f5bd9;
+         --left:280px; --right:340px; --top:52px; }
   *{box-sizing:border-box}
+  html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);
-       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;line-height:1.6}
-  .wrap{max-width:760px;margin:0 auto;padding:48px 20px 80px}
-  h1{font-size:30px;margin:0 0 6px}
-  .sub{color:var(--muted);margin:0 0 28px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin:0 0 20px}
-  label{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
-  input,select{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff;color:var(--ink)}
-  .row{display:flex;gap:12px}
-  .row > div{flex:1}
-  button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:9px;background:var(--accent);
-         color:#fff;font:inherit;font-weight:700;cursor:pointer}
-  button:disabled{opacity:.5;cursor:default}
-  .msg{margin-top:12px;font-size:14px;color:var(--muted);min-height:20px;white-space:pre-wrap}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{border-bottom:1px solid var(--line);text-align:left;padding:9px 8px;vertical-align:top}
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;line-height:1.55}
+  .topbar{height:var(--top);display:flex;align-items:center;gap:14px;padding:0 16px;
+          background:var(--card);border-bottom:1px solid var(--line);position:relative;z-index:1000}
+  .topbar h1{font-size:16px;margin:0;font-weight:700;white-space:nowrap}
+  .topbar .coverage{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+  #addr-search{flex:1;max-width:380px;display:flex;gap:6px}
+  #addr-search input{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font:inherit}
+  #addr-search button{padding:7px 14px;border:0;border-radius:7px;background:var(--accent);color:#fff;
+                      font:inherit;font-weight:600;cursor:pointer}
+  .shell{display:flex;height:calc(100% - var(--top));min-height:0}
+  #panel-left{width:var(--left);flex:none;background:var(--card);border-right:1px solid var(--line);
+              overflow-y:auto;padding:14px}
+  #map-wrap{flex:1;position:relative;min-width:0}
+  #map{position:absolute;inset:0;background:#e9ebef}
+  #panel-right{width:var(--right);flex:none;background:var(--card);border-left:1px solid var(--line);
+               overflow-y:auto;display:flex;flex-direction:column}
+  #panel-right[hidden]{display:none}
+  .sect{font-size:11px;color:var(--muted);margin:14px 0 7px;letter-spacing:.02em}
+  .sect:first-child{margin-top:0}
+  label{display:block;font-size:13px;color:var(--muted);margin:9px 0 4px}
+  input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;background:#fff}
+  .row{display:flex;gap:8px}
+  .row>div{flex:1}
+  .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);margin:5px 0}
+  .chk input{width:auto;margin:0}
+  #judge-form button{margin-top:14px;width:100%;padding:10px;border:0;border-radius:7px;
+                     background:var(--accent);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+  #judge-form button:disabled{opacity:.5;cursor:default}
+  #form-msg{margin-top:9px;font-size:12.5px;color:var(--muted);white-space:pre-wrap;min-height:18px}
+  #legend{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(255,255,255,.94);
+          border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11.5px;max-width:190px}
+  #legend b{display:block;margin-bottom:5px;font-size:11px;color:var(--muted);font-weight:600}
+  #legend .item{display:flex;align-items:center;gap:6px;margin:2px 0}
+  #legend .sw{width:11px;height:11px;border-radius:2px;flex:none}
+  #map-notice{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:500;
+              background:rgba(27,32,48,.88);color:#fff;border-radius:7px;padding:7px 13px;font-size:12.5px;
+              max-width:80%;text-align:center}
+  #map-notice[hidden]{display:none}
+  #tab-bar{display:flex;border-bottom:1px solid var(--line);flex:none}
+  #tab-bar button{flex:1;padding:10px 4px;border:0;background:none;font:inherit;font-size:12.5px;
+                  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+  #tab-bar button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+  .tabpane{padding:13px;display:none}
+  .tabpane.on{display:block}
+  #result-head{padding:13px 13px 0;font-size:12.5px;color:var(--muted)}
+  #result-head .zone{display:block;font-size:15px;color:var(--ink);font-weight:700;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{border-bottom:1px solid var(--line);text-align:left;padding:7px 5px;vertical-align:top}
   th{color:var(--muted);font-weight:600}
+  dl{margin:0;font-size:12.5px}
+  dl div{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+  dt{color:var(--muted)}
+  dd{margin:0;text-align:right}
   .status-저촉{color:#c0392b;font-weight:700}
   .status-비저촉{color:#1e8449;font-weight:700}
-  .status-조건부, .status-판정불가{color:#b9770e;font-weight:700}
-  .note{background:#fef4ec;border:1px solid #e2a06a;border-radius:10px;padding:14px 16px;font-size:14.5px;margin-top:8px}
-  .foot{margin-top:8px;font-size:13px;color:var(--muted)}
+  .status-조건부,.status-판정불가{color:#b9770e;font-weight:700}
+  .note{background:#fef4ec;border:1px solid #e2a06a;border-radius:8px;padding:11px 13px;font-size:13px}
+  .foot{margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .lawitem{border-bottom:1px solid var(--line);padding:9px 0}
+  .lawitem h4{margin:0 0 4px;font-size:13px}
+  .lawitem pre{margin:0;white-space:pre-wrap;font:inherit;font-size:12px;color:var(--muted)}
   a{color:var(--accent)}
-  #map{width:100%;height:340px;border-radius:10px;margin-bottom:14px;background:#e9ebef}
-  .leaflet-container{border-radius:10px;font-family:inherit}
+  .leaflet-container{font-family:inherit}
+  @media (max-width:768px){
+    .shell{flex-direction:column;height:auto}
+    #panel-left,#panel-right{width:auto;border:0;border-top:1px solid var(--line)}
+    #map-wrap{height:56vh;flex:none;order:-1}
+    .topbar{flex-wrap:wrap;height:auto;padding:8px 12px;gap:8px}
+    .topbar .coverage{display:none}
+    #addr-search{max-width:none;width:100%}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
 
+<div class="topbar">
   <h1>사업 분석자동화</h1>
-  <p class="sub">아직 입지분석(부지 규제·인허가 저촉 판정)만 됩니다. 주소를 입력하면 실시간으로 판정표를 만듭니다.</p>
+  <form id="addr-search">
+    <input id="address" placeholder="주소 검색 (예: 목포시 옥암동 1)" autocomplete="off">
+    <button type="submit">검색</button>
+  </form>
+  <span class="coverage">전남 22개 시군</span>
+</div>
 
-  <section class="card">
+<div class="shell">
+
+  <aside id="panel-left">
     <form id="judge-form">
-      <label for="address">부지 주소</label>
-      <input id="address" required placeholder="예: 목포시 옥암동 1">
+      <p class="sect">사업 조건</p>
       <div class="row">
         <div>
           <label for="project_type">사업 종류</label>
@@ -56,58 +111,58 @@
         </div>
         <div>
           <label for="capacity_kw">용량(kW)</label>
-          <input id="capacity_kw" type="number" min="0" step="0.1" placeholder="예: 990">
+          <input id="capacity_kw" type="number" min="0" step="0.1" placeholder="990">
         </div>
       </div>
-      <label>해당하는 경우 선택 (법 제27조의3제3항 — 이격거리 적용 배제)</label>
-      <div class="row" style="gap:16px;flex-wrap:wrap">
-        <label style="flex:none;color:var(--ink);margin:0">
-          <input type="checkbox" class="exemption" value="주민참여형" style="width:auto"> 주민참여형
-        </label>
-        <label style="flex:none;color:var(--ink);margin:0">
-          <input type="checkbox" class="exemption" value="지붕형" style="width:auto"> 지붕형
-        </label>
-        <label style="flex:none;color:var(--ink);margin:0">
-          <input type="checkbox" class="exemption" value="자가소비용" style="width:auto"> 자가소비용
-        </label>
-      </div>
+
+      <p class="sect">이격거리 적용 배제 (법 제27조의3제3항)</p>
+      <label class="chk"><input type="checkbox" class="exemption" value="주민참여형"> 주민참여형</label>
+      <label class="chk"><input type="checkbox" class="exemption" value="지붕형"> 지붕형</label>
+      <label class="chk"><input type="checkbox" class="exemption" value="자가소비용"> 자가소비용</label>
+
       <label for="apply_date">개발행위허가 신청 예정일</label>
       <input id="apply_date" type="date">
+
       <button type="submit" id="submit-btn">판정표 만들기</button>
     </form>
-    <p class="msg" id="form-msg"></p>
-  </section>
+    <p id="form-msg"></p>
 
-  <section class="card" id="result-card" hidden>
-    <div id="map" hidden></div>
-    <div id="result-meta" class="foot"></div>
-    <div id="result-body"></div>
-  </section>
+    <p class="sect">지도 레이어</p>
+    <label class="chk"><input type="checkbox" id="layer-zoning" checked> 용도지역</label>
+    <label class="chk"><input type="checkbox" id="layer-satellite" checked> 위성사진</label>
+  </aside>
 
-  <p><a href="/guestbook.html">방명록</a></p>
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="map-notice" hidden></div>
+    <div id="legend"></div>
+  </div>
+
+  <aside id="panel-right" hidden>
+    <div id="result-head"></div>
+    <div id="tab-bar">
+      <button type="button" data-tab="진단" aria-selected="true">진단</button>
+      <button type="button" data-tab="필지" aria-selected="false">필지</button>
+      <button type="button" data-tab="법령" aria-selected="false">법령</button>
+      <button type="button" data-tab="이격" aria-selected="false">이격</button>
+    </div>
+    <div class="tabpane on" id="tab-진단"></div>
+    <div class="tabpane" id="tab-필지"></div>
+    <div class="tabpane" id="tab-법령"></div>
+    <div class="tabpane" id="tab-이격"></div>
+  </aside>
 
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/map_utils.js"></script>
 <script>
-  const formEl = document.getElementById("judge-form");
-  const msgEl = document.getElementById("form-msg");
-  const btnEl = document.getElementById("submit-btn");
-  const resultCard = document.getElementById("result-card");
-  const resultMeta = document.getElementById("result-meta");
-  const resultBody = document.getElementById("result-body");
-  const mapEl = document.getElementById("map");
-
-  let leafletMap = null;
-  let mapMarkerLayer = null;
-  let mapZoneLayer = null;
-  let mapTileLayer = null;
-  let vworldMapKey = "";
+  let cfg = { vworld_map_key: "", supabase_url: "", supabase_key: "" };
 
   // 페이지 로드 시점에 지도/지오코딩용 브이월드 키를 미리 받아둔다.
   fetch("/api/site_judge?config=1")
     .then(function (res) { return res.json(); })
-    .then(function (cfg) { vworldMapKey = cfg.vworld_map_key || ""; })
+    .then(function (data) { cfg.vworld_map_key = (data && data.vworld_map_key) || ""; })
     .catch(function () {});
 
   // 브이월드 지오코더 REST API는 서버(Vercel)에서 부르면 막히고, 브라우저에서 fetch로
@@ -116,7 +171,7 @@
   // 것과 같은 원리로, 방문자 브라우저에서 직접 좌표를 구해서 그 결과만 서버로 보낸다.
   function geocodeJsonpOnce(address, addrType, timeoutMs) {
     return new Promise(function (resolve) {
-      if (!vworldMapKey) {
+      if (!cfg.vworld_map_key) {
         resolve({ok: false, reason: "브이월드 키를 아직 못 받아왔습니다. 잠시 후 다시 시도해주세요."});
         return;
       }
@@ -150,7 +205,7 @@
         if (!done) { resolve({ok: false, reason: "지오코딩 응답 시간초과"}); cleanup(); }
       }, timeoutMs || 5000);
       const base = "https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0" +
-        "&crs=epsg:4326&format=json&key=" + vworldMapKey + "&address=" + encodeURIComponent(address);
+        "&crs=epsg:4326&format=json&key=" + cfg.vworld_map_key + "&address=" + encodeURIComponent(address);
       script.src = base + "&type=" + addrType + "&callback=" + cbName;
       document.body.appendChild(script);
     });
@@ -160,134 +215,6 @@
     const road = await geocodeJsonpOnce(address, "road");
     if (road.ok) return road;
     return geocodeJsonpOnce(address, "parcel");
-  }
-
-  formEl.addEventListener("submit", async function (event) {
-    event.preventDefault();
-    const address = document.getElementById("address").value.trim();
-    const projectType = document.getElementById("project_type").value;
-    const capacityKw = document.getElementById("capacity_kw").value || "0";
-    const exemptions = Array.from(document.querySelectorAll(".exemption:checked"))
-      .map(function (el) { return el.value; }).join(",");
-    const applyDate = document.getElementById("apply_date").value;
-
-    btnEl.disabled = true;
-    msgEl.textContent = "좌표 변환 중... (브라우저에서 직접 조회)";
-    resultCard.hidden = true;
-
-    try {
-      const geo = await geocodeJsonp(address);
-      if (!geo.ok) {
-        msgEl.textContent = "주소 조회 실패: " + geo.reason;
-        return;
-      }
-
-      msgEl.textContent = "용도지역 조회 -> 규제 매칭 -> 판정 중...";
-      const url = "/api/site_judge?address=" + encodeURIComponent(address) +
-        "&project_type=" + encodeURIComponent(projectType) +
-        "&capacity_kw=" + encodeURIComponent(capacityKw) +
-        "&lon=" + geo.lon + "&lat=" + geo.lat +
-        "&refined_addr=" + encodeURIComponent(geo.refined_addr) +
-        "&exemptions=" + encodeURIComponent(exemptions) +
-        "&apply_date=" + encodeURIComponent(applyDate);
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        msgEl.textContent = "오류: " + (data.error || res.status);
-        return;
-      }
-      render(data);
-      msgEl.textContent = "";
-    } catch (e) {
-      msgEl.textContent = "요청 실패: " + e.message;
-    } finally {
-      btnEl.disabled = false;
-    }
-  });
-
-  function renderMap(data) {
-    const v = data.vworld;
-    if (!v || v.status !== "ok") {
-      mapEl.hidden = true;
-      return;
-    }
-    mapEl.hidden = false;
-
-    if (!leafletMap) {
-      leafletMap = L.map(mapEl, { attributionControl: false });
-      L.control.attribution({ prefix: false }).addTo(leafletMap).addAttribution("© VWorld, 국토교통부");
-    }
-    // Leaflet 컨테이너 크기가 hidden 상태에서 바뀌었을 수 있으니 다시 계산
-    setTimeout(function () { leafletMap.invalidateSize(); }, 0);
-
-    const key = data.vworld_map_key;
-    if (key && !mapTileLayer) {
-      mapTileLayer = L.tileLayer(
-        "https://api.vworld.kr/req/wmts/1.0.0/" + key + "/Satellite/{z}/{y}/{x}.jpeg",
-        { maxZoom: 19, tileSize: 256 }
-      ).addTo(leafletMap);
-    }
-
-    const latlng = [v.lat, v.lon];
-    leafletMap.setView(latlng, 18);
-
-    if (mapMarkerLayer) leafletMap.removeLayer(mapMarkerLayer);
-    mapMarkerLayer = L.marker(latlng).addTo(leafletMap);
-
-    if (mapZoneLayer) {
-      leafletMap.removeLayer(mapZoneLayer);
-      mapZoneLayer = null;
-    }
-    const geom = data.eum && data.eum.zone_geometry;
-    if (geom) {
-      mapZoneLayer = L.geoJSON(geom, {
-        style: { color: "#3f8cff", weight: 3, dashArray: "6 4", fillColor: "#3f8cff", fillOpacity: 0.15 },
-      }).addTo(leafletMap);
-      leafletMap.fitBounds(mapZoneLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
-    }
-  }
-
-  function render(data) {
-    resultCard.hidden = false;
-    renderMap(data);
-    const refined = (data.vworld && data.vworld.refined_addr) || data.input.address;
-    resultMeta.textContent = refined + " · " + data.input.project_type + " " + data.input.target_capacity_kw + "kW";
-
-    if (data.note) {
-      resultBody.innerHTML = '<div class="note">' + escapeHtml(data.note) +
-        '</div><p class="foot">※ 이 시스템은 확실하지 않으면 절대 "비저촉"으로 단정하지 않고 사람 확인을 요구합니다.</p>';
-      return;
-    }
-
-    if (!data.table.length) {
-      resultBody.innerHTML = '<p class="msg">해당 부지에 걸리는 규제 항목을 찾지 못했습니다. (규칙표 미등록 가능성 - 사람 확인 권장)</p>';
-      return;
-    }
-
-    const rows = data.table.map(function (row) {
-      return "<tr>" +
-        "<td>" + escapeHtml(row["항목"] || "") + "</td>" +
-        '<td class="status-' + escapeHtml(row["판정"] || "") + '">' + escapeHtml(row["판정"] || "") + "</td>" +
-        "<td>" + escapeHtml(row["근거조문"] || "") + "</td>" +
-        "<td>" + (row["출처"] ? '<a href="' + escapeAttr(row["출처"]) + '" target="_blank">출처</a>' : "") + "</td>" +
-        "<td>" + escapeHtml(row["비고"] || "") + "</td>" +
-        "</tr>";
-    }).join("");
-
-    resultBody.innerHTML =
-      "<table><thead><tr><th>항목</th><th>판정</th><th>근거조문</th><th>출처</th><th>비고</th></tr></thead><tbody>" +
-      rows + "</tbody></table>" +
-      '<p class="foot">※ "조건부"/"판정불가"는 사람 검토가 필요한 항목입니다.</p>';
-  }
-
-  function escapeHtml(text) {
-    return String(text).replace(/[&<>"']/g, function (ch) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
-    });
-  }
-  function escapeAttr(text) {
-    return String(text).replace(/"/g, "&quot;");
   }
 </script>
 </body>
