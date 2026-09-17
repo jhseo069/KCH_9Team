@@ -49,3 +49,50 @@ def test_request_without_address_and_without_coordinates_is_rejected():
 
     assert reason is not None
     assert "주소" in reason
+
+
+def test_law_path_is_routed_to_the_law_handler():
+    api = load_api()
+
+    assert api.route_for("/api/site_judge/law?law_name=x") == "law"
+    assert api.route_for("/api/site_judge?address=x") == "judge"
+    assert api.route_for("/api/site_judge") == "judge"
+
+
+def test_law_lookup_returns_article_text(monkeypatch):
+    api = load_api()
+    monkeypatch.setattr(api, "lookup_article_text",
+                        lambda law_name, law_article: {
+                            "status": "ok", "text": "① 조문 본문",
+                            "article_title": "용도지역에서의 건축 제한",
+                            "effective_date": "20260101",
+                            "source_url": "https://www.law.go.kr/...",
+                        })
+
+    result = api.fetch_law({"law_name": ["국토의 계획 및 이용에 관한 법률"], "law_article": ["제76조"]})
+
+    assert result["status"] == "ok"
+    assert result["text"] == "① 조문 본문"
+
+
+def test_law_lookup_without_parameters_is_rejected():
+    api = load_api()
+
+    result = api.fetch_law({})
+
+    assert result["status"] == "no_data"
+
+
+def test_law_response_never_contains_the_oc_key(monkeypatch):
+    """OC는 개인 접근키다. 응답 URL에 섞여 나가면 브라우저에 그대로 노출된다."""
+    api = load_api()
+    monkeypatch.setattr(api, "lookup_article_text",
+                        lambda law_name, law_article: {
+                            "status": "ok", "text": "t", "article_title": "a",
+                            "effective_date": "20260101",
+                            "source_url": "https://www.law.go.kr/DRF/lawService.do?target=law&MST=1&type=HTML",
+                        })
+
+    result = api.fetch_law({"law_name": ["법"], "law_article": ["제1조"]})
+
+    assert "OC=" not in result["source_url"]

@@ -31,6 +31,7 @@ try:
     import pandas as pd  # noqa: E402
     from export_output import generate_output_table  # noqa: E402
     from judge import judge  # noqa: E402
+    from law_lookup import lookup_article_text  # noqa: E402
     from match_regulations import match_regulations  # noqa: E402
     from query_site_data import query_site  # noqa: E402
     from setback_check import check_setback, to_judgment_row, unevaluated_judgment_row  # noqa: E402
@@ -74,6 +75,31 @@ def missing_input_reason(query: dict):
     if address or (lon and lat):
         return None
     return "주소 또는 좌표(lon/lat)가 필요합니다"
+
+
+def route_for(path: str) -> str:
+    """요청 경로 -> 처리 이름.
+
+    이 Vercel 프로젝트는 api/ 에 handler 파일을 하나만 둘 수 있어서(pyproject.toml의
+    entrypoint로 고정) 엔드포인트를 파일로 늘릴 수 없다. 경로로 분기한다.
+    """
+    return "law" if urlparse(path).path.rstrip("/").endswith("/law") else "judge"
+
+
+def fetch_law(query: dict) -> dict:
+    """판정 근거 조문의 원문을 law.go.kr에서 실시간 조회한다.
+
+    규칙표(rule_table.csv)에도 발췌본이 있지만 담아둔 시점의 사본이다. 법령 탭은
+    지금 시행 중인 원문을 보여주는 것이 목적이므로 매번 새로 가져온다.
+    """
+    law_name = (query.get("law_name") or [""])[0].strip()
+    law_article = (query.get("law_article") or [""])[0].strip()
+    if not law_name or not law_article:
+        return {"status": "no_data", "reason": "law_name과 law_article이 필요합니다"}
+    try:
+        return lookup_article_text(law_name, law_article)
+    except Exception as e:
+        return {"status": "no_data", "reason": f"조문 조회 실패: {type(e).__name__}: {e}"}
 
 
 def _judge_setback(eum_result: dict, project_type: str, exemptions: list, apply_date_str: str) -> dict:
@@ -144,6 +170,13 @@ def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_res
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
+
+        if route_for(self.path) == "law":
+            if IMPORT_ERROR is not None:
+                self._send_json({"status": "no_data", "reason": "서버 모듈 로드 실패"}, status=500)
+                return
+            self._send_json(fetch_law(query))
+            return
 
         # 지도 타일용 키를 페이지 로드 시점(주소 입력 전)에 미리 받아가기 위한 설정 조회.
         # src/ import 여부와 무관하게 항상 동작해야 하므로 아래 IMPORT_ERROR 체크보다 앞에 둔다.

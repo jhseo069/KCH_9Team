@@ -473,6 +473,57 @@
       (row["출처"] ? '<p class="foot"><a href="' + escapeAttr(row["출처"]) + '" target="_blank">조례 원문</a></p>' : "");
   }
 
+  // 판정표의 '항목'에서 법령명과 조문을 뽑는다. rule_table.csv의 law_name/law_article이
+  // 그대로 오지 않으므로, 서버가 준 근거조문 텍스트 앞부분에 있는 법령명·조문 표기를 쓴다.
+  const LAW_PATTERN = /([가-힣ㆍ·\s]+(?:법|법률|조례|규칙|시행령|시행규칙))\s*(제\d+조(?:의\s*\d+)?|별표\s*\d+)/;
+
+  async function loadLawTab() {
+    const el = document.getElementById("tab-법령");
+    if (!lastData || !lastData.table || !lastData.table.length) {
+      el.innerHTML = '<p class="foot">판정 결과가 없습니다.</p>';
+      return;
+    }
+    const seen = new Set();
+    const targets = [];
+    lastData.table.forEach(function (r) {
+      const m = LAW_PATTERN.exec(r["근거조문"] || "");
+      if (!m) return;
+      const key = m[1].trim() + " " + m[2].replace(/\s/g, "");
+      if (seen.has(key)) return;
+      seen.add(key);
+      targets.push({ law_name: m[1].trim(), law_article: m[2].replace(/\s/g, "") });
+    });
+
+    if (!targets.length) {
+      el.innerHTML = '<p class="foot">근거 조문을 식별하지 못했습니다. 진단 탭의 근거조문을 확인하세요.</p>';
+      return;
+    }
+
+    el.innerHTML = '<p class="foot">조문을 불러오는 중...</p>';
+    const parts = await Promise.all(targets.map(async function (t) {
+      try {
+        const res = await fetch("/api/site_judge/law?law_name=" + encodeURIComponent(t.law_name) +
+                                "&law_article=" + encodeURIComponent(t.law_article));
+        const d = await res.json();
+        if (d.status !== "ok") {
+          return '<div class="lawitem"><h4>' + escapeHtml(t.law_name + " " + t.law_article) +
+                 '</h4><pre>조회 실패: ' + escapeHtml(d.reason || "") + "</pre></div>";
+        }
+        return '<div class="lawitem"><h4>' + escapeHtml(t.law_name + " " + t.law_article) +
+               " " + escapeHtml(d.article_title || "") + "</h4>" +
+               "<pre>" + escapeHtml(d.text || "") + "</pre>" +
+               '<p class="foot">시행 ' + escapeHtml(d.effective_date || "-") +
+               (d.source_url ? ' · <a href="' + escapeAttr(d.source_url) + '" target="_blank">원문</a>' : "") +
+               "</p></div>";
+      } catch (e) {
+        return '<div class="lawitem"><h4>' + escapeHtml(t.law_name + " " + t.law_article) +
+               '</h4><pre>요청 실패: ' + escapeHtml(e.message) + "</pre></div>";
+      }
+    }));
+    el.innerHTML = parts.join("") +
+      '<p class="foot">법령 원문은 국가법령정보센터에서 실시간으로 가져옵니다.</p>';
+  }
+
   function escapeHtml(text) {
     return String(text == null ? "" : text).replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
