@@ -167,55 +167,61 @@ def main():
             print(f"  {k:<22}{v:>7,}")
         return 0
 
-    db_url = os.getenv("SUPABASE_DB_URL")
-    if not db_url:
-        print("SUPABASE_DB_URL이 .env에 없습니다.")
-        print("Supabase 대시보드 > Project Settings > Database > Connection string(URI)을")
-        print(".env에 SUPABASE_DB_URL= 로 넣어주세요.")
+    base_url = os.getenv("SUPABASE_URL")
+    secret = os.getenv("SUPABASE_SECRET_KEY")
+    if not base_url or not secret:
+        print("SUPABASE_URL 또는 SUPABASE_SECRET_KEY가 .env에 없습니다.")
+        print("Supabase 대시보드 > Project Settings > API 에서 확인해 .env에 넣어주세요.")
         return 1
 
-    import psycopg2
-    from psycopg2.extras import execute_values
+    import requests
 
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = False
-    cur = conn.cursor()
+    # secret 키는 RLS를 무시하는 전권 키다. 서버(이 스크립트)에서만 쓰고 절대
+    # 브라우저로 내려보내지 않는다 - 브라우저용은 PUBLISHABLE 키뿐이다.
+    session = requests.Session()
+    session.headers.update({
+        "apikey": secret,
+        "Authorization": f"Bearer {secret}",
+        "Content-Type": "application/json",
+    })
+    rpc = f"{base_url.rstrip('/')}/rest/v1/rpc/insert_zoning_batch"
 
-    cur.execute("select count(*) from zoning")
-    existing = cur.fetchone()[0]
-    if existing:
-        print(f"zoning 테이블에 이미 {existing:,}건이 있습니다. 전부 지우고 다시 넣습니다.")
-        cur.execute("truncate table zoning")
+    def send(rows):
+        res = session.post(rpc, json={"rows": rows}, timeout=180)
+        if res.status_code >= 400:
+            raise RuntimeError(f"적재 실패 HTTP {res.status_code}: {res.text[:400]}")
+        return res.json()
 
-    sql = (
-        "insert into zoning "
-        "(sgg_cd, sgg_nm, zone_code, zone_name, zone_category, is_generic, area_sqm, geom) "
-        "values %s"
-    )
-    template = "(%s,%s,%s,%s,%s,%s,%s, st_setsrid(st_geomfromwkb(decode(%s,'hex')),4326))"
+    # 기존 데이터 확인 (같은 데이터를 두 번 넣으면 좌표 하나가 여러 폴리곤에 걸려
+    # 전부 '겹침 -> 판정불가'가 되어버린다)
+    head = session.get(f"{base_url.rstrip('/')}/rest/v1/zoning",
+                       params={"select": "id", "limit": "1"},
+                       headers={"Prefer": "count=exact"}, timeout=60)
+    if head.status_code >= 400:
+        print(f"zoning 테이블 조회 실패 HTTP {head.status_code}: {head.text[:300]}")
+        print("scripts/supabase_schema.sql 을 SQL Editor에서 먼저 실행하셨는지 확인해주세요.")
+        return 1
+    existing = head.headers.get("content-range", "*/0").split("/")[-1]
+    if existing not in ("0", "*"):
+        print(f"zoning 테이블에 이미 {existing}건이 있습니다.")
+        print("중복 적재는 좌표가 여러 폴리곤에 걸려 전부 판정불가가 되므로 중단합니다.")
+        print("다시 넣으려면 SQL Editor에서 'truncate table zoning;' 을 먼저 실행하세요.")
+        return 1
 
     batch, total = [], 0
     for row in iter_rows():
-        batch.append((row["sgg_cd"], row["sgg_nm"], row["zone_code"], row["zone_name"],
-                      row["zone_category"], row["is_generic"], row["area_sqm"], row["wkb"]))
+        batch.append(row)
         if len(batch) >= args.batch:
-            execute_values(cur, sql, batch, template=template, page_size=args.batch)
+            send(batch)
             total += len(batch)
             batch = []
             if total % 5000 == 0:
-                conn.commit()
                 print(f"  {total:,}건 적재", flush=True)
     if batch:
-        execute_values(cur, sql, batch, template=template, page_size=len(batch))
+        send(batch)
         total += len(batch)
 
-    conn.commit()
-    cur.execute("select zone_category, count(*) from zoning group by 1 order by 2 desc")
     print(f"\n적재 완료: {total:,}건")
-    for cat, n in cur.fetchall():
-        print(f"  {cat:<22}{n:>7,}")
-    cur.close()
-    conn.close()
     return 0
 
 

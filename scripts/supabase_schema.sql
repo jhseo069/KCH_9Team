@@ -68,6 +68,32 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 적재용: WKB(16진 문자열) 묶음을 한 번에 넣는다
+-- ---------------------------------------------------------------------------
+-- DB에 직접 접속(비밀번호)하는 대신 secret 키로 이 함수를 호출해서 넣는다.
+-- security definer가 아니라 기본(invoker) 권한이므로, secret 키(service_role)로만
+-- 호출된다. 공개 키(anon)에는 실행 권한을 주지 않는다 - 아래 revoke/grant 참고.
+create or replace function insert_zoning_batch(rows jsonb)
+returns integer
+language sql
+as $$
+  with ins as (
+    insert into zoning (sgg_cd, sgg_nm, zone_code, zone_name, zone_category,
+                        is_generic, area_sqm, geom)
+    select r->>'sgg_cd', r->>'sgg_nm', r->>'zone_code', r->>'zone_name',
+           r->>'zone_category', (r->>'is_generic')::boolean,
+           nullif(r->>'area_sqm','')::double precision,
+           st_setsrid(st_geomfromwkb(decode(r->>'wkb','hex')), 4326)
+    from jsonb_array_elements(rows) as r
+    returning 1
+  )
+  select count(*)::integer from ins;
+$$;
+
+revoke all on function insert_zoning_batch(jsonb) from public, anon, authenticated;
+grant execute on function insert_zoning_batch(jsonb) to service_role;
+
+-- ---------------------------------------------------------------------------
 -- 지도 표시용: 화면 범위 안의 폴리곤을 단순화해서 반환
 -- ---------------------------------------------------------------------------
 -- 판정에는 절대 쓰지 않는다. 단순화한 경계로 판정하면 경계 근처 부지에서 용도지역이

@@ -20,6 +20,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_GEOJSON_PATH = BASE_DIR / "data" / "zoning_jeonnam.geojson"
 
 
+def resolve_matches(matches: list) -> dict:
+    """좌표에 걸린 폴리곤 목록 -> 최종 판단(ok / no_match / ambiguous).
+
+    matches의 각 항목은 zone_name/zone_code/sgg_cd/sgg_nm/geometry를 가진 dict이며,
+    is_generic이 True면 세부 용도가 정해지지 않은 '광역' 폴리곤이다.
+
+    광역 폴리곤('도시지역', '관리지역')은 구체 폴리곤('제1종일반주거지역')과 반드시
+    겹친다 - 같은 땅을 크게 한 번, 세밀하게 한 번 그린 것이기 때문이다. 둘을 동등하게
+    세면 해당 지역 전체가 '겹침 -> 판정불가'가 되어 아무 답도 못 낸다. 그래서 구체
+    폴리곤이 하나라도 있으면 그쪽만 보고, 광역은 달리 알 길이 없을 때만 쓴다.
+
+    다만 구체 폴리곤끼리 겹치는 경우(오래된 중복 고시 등)는 여전히 판정불가다.
+    어느 쪽이 맞는지 코드가 고를 근거가 없고, 잘못 고르면 '비저촉'이 틀리게 나온다.
+    """
+    specific = [m for m in matches if not m.get("is_generic")]
+    candidates = specific or matches
+
+    if len(candidates) == 1:
+        m = candidates[0]
+        return {
+            "status": "ok",
+            "zone_name": m["zone_name"],
+            "zone_code": m["zone_code"],
+            "sgg_nm": m["sgg_nm"],
+            "sgg_cd": m["sgg_cd"],
+            "is_generic": bool(m.get("is_generic")),
+            "geometry": m.get("geometry"),
+        }
+    if not candidates:
+        return {"status": "no_match", "reason": "해당 좌표를 포함하는 용도지역 폴리곤이 없음"}
+    return {
+        "status": "ambiguous",
+        "candidates": candidates,
+        "reason": f"{len(candidates)}개 폴리곤이 겹침 (오래된 중복 데이터 가능성) - 사람 확인 필요",
+    }
+
+
 def find_zone_by_coordinate(lon: float, lat: float, geojson_path: Path = DEFAULT_GEOJSON_PATH) -> dict:
     """좌표(lon, lat)가 속한 용도지역 폴리곤을 찾는다.
 
@@ -38,20 +75,4 @@ def find_zone_by_coordinate(lon: float, lat: float, geojson_path: Path = DEFAULT
         if geom.intersects(point):
             matches.append(feature)
 
-    if len(matches) == 1:
-        props = matches[0]["properties"]
-        return {
-            "status": "ok",
-            "zone_name": props["zone_name"],
-            "zone_code": props["zone_code"],
-            "sgg_nm": props["sgg_nm"],
-            "sgg_cd": props["sgg_cd"],
-            "geometry": matches[0]["geometry"],
-        }
-    if len(matches) == 0:
-        return {"status": "no_match", "reason": "해당 좌표를 포함하는 용도지역 폴리곤이 없음"}
-    return {
-        "status": "ambiguous",
-        "candidates": [m["properties"] for m in matches],
-        "reason": f"{len(matches)}개 폴리곤이 겹침 (오래된 중복 데이터 가능성) - 사람 확인 필요",
-    }
+    return resolve_matches([{**m["properties"], "geometry": m["geometry"]} for m in matches])
