@@ -49,6 +49,20 @@ except Exception as e:
 SETBACK_TABLE_PATH = os.path.join(DATA_DIR, "setback_table.csv")
 
 
+def build_config() -> dict:
+    """페이지 로드 시점에 클라이언트가 필요로 하는 공개 설정값.
+
+    브라우저가 Supabase를 직접 호출해 용도지역 레이어를 받아가므로 URL과 공개 키가
+    필요하다. publishable 키는 애초에 브라우저 노출용이고 RLS가 읽기만 허용한다.
+    SUPABASE_SECRET_KEY(전권 키)는 어떤 경우에도 여기에 넣지 않는다.
+    """
+    return {
+        "vworld_map_key": os.environ.get("VWORLD_API_KEY", ""),
+        "supabase_url": os.environ.get("SUPABASE_URL", ""),
+        "supabase_key": os.environ.get("SUPABASE_PUBLISHABLE_KEY", ""),
+    }
+
+
 def _judge_setback(eum_result: dict, project_type: str, exemptions: list, apply_date_str: str) -> dict:
     """이격거리 판정 행을 만든다.
 
@@ -121,7 +135,7 @@ class handler(BaseHTTPRequestHandler):
         # 지도 타일용 키를 페이지 로드 시점(주소 입력 전)에 미리 받아가기 위한 설정 조회.
         # src/ import 여부와 무관하게 항상 동작해야 하므로 아래 IMPORT_ERROR 체크보다 앞에 둔다.
         if "config" in query:
-            self._send_json({"vworld_map_key": os.environ.get("VWORLD_API_KEY", "")})
+            self._send_json(build_config())
             return
 
         address = (query.get("address") or [""])[0].strip()
