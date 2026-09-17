@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from law_lookup import (
-    parse_article, extract_article_number, parse_appendix, extract_appendix_number,
+    parse_article, extract_article_number, extract_article_parts, parse_appendix, extract_appendix_number,
     parse_ordinance_article,
 )
 
@@ -113,3 +113,24 @@ def test_parse_ordinance_article_returns_none_when_not_found():
     result = parse_ordinance_article(ORDINANCE_FIXTURE, "999")
 
     assert result is None
+
+
+def test_parse_article_with_branch_number_returns_branch_article():
+    result = parse_article(FIXTURE, "76", branch_no="2")
+
+    assert result is not None
+    assert result["article_title"] == "가지번호 조문 테스트용 제목"
+    assert "제76조의2의 내용" in result["text"]
+
+
+def test_parse_article_without_branch_number_skips_branch_articles():
+    result = parse_article(FIXTURE, "76")
+
+    assert result["article_title"] == "용도지역 및 용도지구에서의 건축물의 건축 제한 등"
+    assert "제76조의2의 내용" not in result["text"]
+
+
+def test_extract_article_parts_splits_branch_number():
+    assert extract_article_parts("제27조의3") == ("27", "3")
+    assert extract_article_parts("제76조") == ("76", None)
+    assert extract_article_parts("별표20") is None

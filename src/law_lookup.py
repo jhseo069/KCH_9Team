@@ -21,7 +21,7 @@ LAW_SEARCH_URL = "https://www.law.go.kr/DRF/lawSearch.do"
 LAW_SERVICE_URL = "https://www.law.go.kr/DRF/lawService.do"
 DEFAULT_OC = os.getenv("LAW_GO_KR_OC", "test")
 
-_ARTICLE_NO_PATTERN = re.compile(r"제(\d+)조")
+_ARTICLE_NO_PATTERN = re.compile(r"제(\d+)조(?:의\s*(\d+))?")
 _APPENDIX_NO_PATTERN = re.compile(r"별표\s*(\d+)")
 
 
@@ -29,6 +29,18 @@ def extract_article_number(law_article: str) -> str | None:
     """'제76조', '국토계획법 제8조' 같은 표기에서 조문번호만 추출. '별표20' 등은 None."""
     match = _ARTICLE_NO_PATTERN.search(law_article or "")
     return match.group(1) if match else None
+
+
+def extract_article_parts(law_article: str) -> tuple[str, str | None] | None:
+    """'제27조의3' -> ('27', '3'), '제76조' -> ('76', None), '별표20' -> None.
+
+    law.go.kr XML은 가지번호 조문을 <조문번호>27</조문번호><조문가지번호>3</조문가지번호>로
+    표현한다. 조문번호만 비교하면 제27조와 제27조의2·의3이 전부 같은 조문으로 취급된다.
+    """
+    match = _ARTICLE_NO_PATTERN.search(law_article or "")
+    if match is None:
+        return None
+    return match.group(1), match.group(2)
 
 
 def extract_appendix_number(law_article: str) -> str | None:
@@ -54,8 +66,8 @@ def _paragraph_full_text(hang: ET.Element) -> str:
     return "\n".join(parts)
 
 
-def parse_article(xml_text: str, article_no: str) -> dict | None:
-    """법령 전문 XML에서 article_no에 해당하는 조문(장 제목 아닌 실제 조문)만 추출.
+def parse_article(xml_text: str, article_no: str, branch_no: str | None = None) -> dict | None:
+    """법령 전문 XML에서 article_no(+가지번호)에 해당하는 조문만 추출.
     각 항에 중첩된 호ㆍ목(세부 목록)까지 포함해 누락 없이 가져온다."""
     root = ET.fromstring(xml_text)
     effective_date = root.findtext(".//기본정보/시행일자")
@@ -65,6 +77,8 @@ def parse_article(xml_text: str, article_no: str) -> dict | None:
         if title is None:
             continue  # 조문제목이 없으면 장/절 헤더 - 실제 조문이 아님
         if unit.findtext("조문번호") != article_no:
+            continue
+        if (unit.findtext("조문가지번호") or None) != branch_no:
             continue
 
         paragraphs = [_paragraph_full_text(p) for p in unit.findall("항")]
@@ -264,9 +278,11 @@ def lookup_article_text(law_name: str, law_article: str, oc: str = DEFAULT_OC) -
         return _lookup(law_name, oc, lambda xml: parse_appendix(xml, appendix_no),
                         not_found_reason=f"{law_name}에서 별표{appendix_no}를 찾을 수 없음")
 
-    article_no = extract_article_number(law_article)
-    if article_no is None:
+    parts = extract_article_parts(law_article)
+    if parts is None:
         return {"status": "no_data", "reason": f"조문번호를 해석할 수 없음: '{law_article}'"}
 
-    return _lookup(law_name, oc, lambda xml: parse_article(xml, article_no),
-                    not_found_reason=f"{law_name}에서 제{article_no}조를 찾을 수 없음")
+    article_no, branch_no = parts
+    label = f"제{article_no}조" + (f"의{branch_no}" if branch_no else "")
+    return _lookup(law_name, oc, lambda xml: parse_article(xml, article_no, branch_no),
+                    not_found_reason=f"{law_name}에서 {label}를 찾을 수 없음")
