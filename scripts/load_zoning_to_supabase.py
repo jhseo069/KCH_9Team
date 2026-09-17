@@ -154,6 +154,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="DB 접속 없이 건수만 확인")
     ap.add_argument("--batch", type=int, default=500)
+    ap.add_argument("--resume", action="store_true",
+                    help="이미 들어간 건수 다음부터 이어서 적재 (중단된 작업 재개용)")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -186,11 +188,30 @@ def main():
     })
     rpc = f"{base_url.rstrip('/')}/rest/v1/rpc/insert_zoning_batch"
 
-    def send(rows):
-        res = session.post(rpc, json={"rows": rows}, timeout=180)
-        if res.status_code >= 400:
-            raise RuntimeError(f"적재 실패 HTTP {res.status_code}: {res.text[:400]}")
-        return res.json()
+    # Supabase 앞단(Cloudflare)이 간헐적으로 520/502를 돌려준다. 8만 건을 넣는 동안
+    # 한 번만 나와도 전체가 멈추므로, 일시적인 오류는 잠깐 쉬었다 다시 보낸다.
+    # 데이터 문제(4xx)는 다시 보내도 같으므로 즉시 실패시킨다.
+    RETRYABLE = {429, 500, 502, 503, 504, 520, 521, 522, 524}
+
+    def send(rows, max_attempts=5):
+        import time
+        last = None
+        for attempt in range(max_attempts):
+            try:
+                res = session.post(rpc, json={"rows": rows}, timeout=180)
+            except Exception as e:
+                last = f"요청 실패: {e}"
+            else:
+                if res.status_code < 400:
+                    return res.json()
+                if res.status_code not in RETRYABLE:
+                    raise RuntimeError(f"적재 실패 HTTP {res.status_code}: {res.text[:400]}")
+                last = f"HTTP {res.status_code}"
+            if attempt < max_attempts - 1:
+                wait = 3 * (attempt + 1)
+                print(f"    ({last}) {wait}초 후 재시도 {attempt + 2}/{max_attempts}", flush=True)
+                time.sleep(wait)
+        raise RuntimeError(f"적재 실패(재시도 {max_attempts}회 소진): {last}")
 
     # 기존 데이터 확인 (같은 데이터를 두 번 넣으면 좌표 하나가 여러 폴리곤에 걸려
     # 전부 '겹침 -> 판정불가'가 되어버린다)
@@ -201,15 +222,26 @@ def main():
         print(f"zoning 테이블 조회 실패 HTTP {head.status_code}: {head.text[:300]}")
         print("scripts/supabase_schema.sql 을 SQL Editor에서 먼저 실행하셨는지 확인해주세요.")
         return 1
-    existing = head.headers.get("content-range", "*/0").split("/")[-1]
-    if existing not in ("0", "*"):
-        print(f"zoning 테이블에 이미 {existing}건이 있습니다.")
-        print("중복 적재는 좌표가 여러 폴리곤에 걸려 전부 판정불가가 되므로 중단합니다.")
-        print("다시 넣으려면 SQL Editor에서 'truncate table zoning;' 을 먼저 실행하세요.")
-        return 1
+    existing_text = head.headers.get("content-range", "*/0").split("/")[-1]
+    existing = 0 if existing_text in ("0", "*") else int(existing_text)
+    skip = 0
+    if existing:
+        if not args.resume:
+            print(f"zoning 테이블에 이미 {existing:,}건이 있습니다.")
+            print("중복 적재는 좌표가 여러 폴리곤에 걸려 전부 판정불가가 되므로 중단합니다.")
+            print("이어받으려면 --resume, 처음부터 다시 넣으려면 SQL Editor에서")
+            print("'truncate table zoning;' 을 먼저 실행하세요.")
+            return 1
+        # 배치는 하나의 SQL 문이라 전부 성공하거나 전부 실패한다. 따라서 현재 건수가
+        # 곧 '성공한 행 수'이고, 원본을 같은 순서로 읽으면 그 다음부터 이어붙일 수 있다.
+        skip = existing
+        print(f"이어받기: 이미 {existing:,}건 -> 앞의 {skip:,}건을 건너뛰고 계속합니다.")
 
-    batch, total = [], 0
+    batch, total, seen = [], 0, 0
     for row in iter_rows():
+        seen += 1
+        if seen <= skip:
+            continue
         batch.append(row)
         if len(batch) >= args.batch:
             send(batch)
