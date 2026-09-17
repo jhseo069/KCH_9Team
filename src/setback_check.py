@@ -69,6 +69,11 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
 
     확실하지 않으면 판정불가를 돌려준다 - 이 함수는 어떤 경우에도 '저촉'을 반환하지 않는다.
     반경 내 주택 실측이 범위 밖이라 저촉을 확정할 근거가 없기 때문이다.
+
+    distance_m/min_house_count 셀의 빈 값과 파싱 불가 값은 의미가 다르다: 빈 셀은
+    "사람이 확인한 결과 규정이 없음"(R3, 비저촉)이고, "약 100"처럼 숫자로 읽을 수
+    없는 비어있지 않은 값은 확인되지 않은 데이터 오류(R2-b, 판정불가)다. 후자를
+    빈 값과 같이 취급해 비저촉으로 단정하지 않는다.
     """
     # R1. 법이 정한 적용 배제 대상 (조례 내용과 무관하게 확정)
     for name in exemptions or []:
@@ -102,6 +107,21 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
 
     row = matched.iloc[0]
     ordinance = _ordinance_payload(row)
+
+    # R2-b. 빈 셀("확인 결과 규정 없음")과 파싱 불가 값("사람이 적었지만 숫자로
+    # 못 읽는 값", 예: "약 100")은 서로 다르다. 빈 셀은 R3(비저촉)으로 확정할 수
+    # 있지만, 파싱 불가 값은 데이터 확인 실패이지 규정이 없다는 뜻이 아니므로
+    # 절대 비저촉으로 단정하지 않고 판정불가로 둔다.
+    for column, label in (("distance_m", "이격거리"), ("min_house_count", "밀집 기준 호수")):
+        raw = str(row[column]).strip()
+        if raw and _to_int(row[column]) is None:
+            return {
+                "status": "판정불가",
+                "rule": "R2-b",
+                "reason": f"{label} 값을 숫자로 해석할 수 없음: '{raw}' - 조례 표 데이터 확인 필요",
+                "ordinance": ordinance,
+                "statute": STATUTE,
+            }
 
     # R3. 확인 결과 조례에 이격거리 규정 자체가 없는 경우
     if ordinance["distance_m"] is None:

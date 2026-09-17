@@ -69,6 +69,25 @@ def test_confirmed_no_ordinance_rule_is_not_violating():
     assert result["rule"] == "R3"
 
 
+def test_unparseable_distance_is_undecidable_not_no_restriction():
+    bad_row = dict(CONFIRMED_MOKPO, distance_m="약 100")
+    result = check_setback("12110", "태양광", AFTER, [], {}, _table([bad_row]))
+
+    assert result["status"] != "비저촉"
+    assert result["status"] == "판정불가"
+    assert result["rule"] == "R2-b"
+    assert "약 100" in result["reason"]
+
+
+def test_unparseable_min_house_count_is_undecidable_not_no_restriction():
+    bad_row = dict(CONFIRMED_MOKPO, min_house_count="다섯")
+    result = check_setback("12110", "태양광", AFTER, [], {}, _table([bad_row]))
+
+    assert result["status"] != "비저촉"
+    assert result["status"] == "판정불가"
+    assert result["rule"] == "R2-b"
+
+
 def test_application_before_statute_keeps_ordinance():
     result = check_setback("12110", "태양광", BEFORE, [], {}, _table([CONFIRMED_MOKPO]))
 
