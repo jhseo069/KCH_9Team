@@ -161,7 +161,13 @@
 
   // 전남 중심. 처음에는 줌 9로 전체를 보여준다(용도지역은 아직 안 칠해진다).
   const JEONNAM_CENTER = [34.86, 126.99];
-  const MAX_ZONING_ROWS = 3000;
+  // PostgREST(Supabase)가 max_rows로 얼마를 넘기든 응답을 1,000행에서 잘라버린다(실측
+  // 확인됨) - 이건 우리가 고른 값이 아니라 PostgREST의 상한이다. 더 올리려면 서버의
+  // db-max-rows 설정을 바꿔야 하는데, 브라우저에서는 그 설정에 손댈 수 없다. 이 숫자를
+  // 실제 상한보다 크게 두면 잘림 안내가 절대 뜨지 않아 사용자가 빈 곳을 보고 "용도지역
+  // 없음"으로 오해하게 된다 - 그래서 요청 max_rows와 잘림 판정 기준을 반드시 이 값 하나로
+  // 맞춘다. 나중에 "최적화"랍시고 3000으로 되돌리지 말 것.
+  const MAX_ZONING_ROWS = 1000;
 
   let cfg = { vworld_map_key: "", supabase_url: "", supabase_key: "" };
   let leafletMap = null, tileLayer = null, zoningLayer = null;

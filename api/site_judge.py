@@ -166,8 +166,32 @@ def run_pipeline(address: str, project_type: str, capacity_kw: float, vworld_res
     judged.append(setback_row)
 
     df = generate_output_table(judged)
-    response["table"] = df.to_dict(orient="records")
+    response["table"] = dataframe_to_json_records(df)
     return response
+
+
+def dataframe_to_json_records(df: "pd.DataFrame") -> list:
+    """판정표 DataFrame -> JSON 응답에 안전하게 실을 수 있는 레코드 리스트.
+
+    generate_output_table()의 "비고" 열은 item.get("note")를 그대로 옮기는데, note가
+    없는 행(judge()가 만든 대부분의 행)은 pandas가 float('nan')으로 채운다.
+    json.dumps는 그 NaN을 표준 JSON이 아닌 bare 토큰 NaN으로 내보내고, 브라우저의
+    JSON.parse는 이를 거부해서 판정 결과가 화면에 아예 안 뜬다 - 파이썬 requests.json()은
+    NaN을 관대하게 받아줘서 이 문제가 그동안 테스트를 통과해왔다. generate_output_table의
+    반환 타입(DataFrame)은 CSV/XLSX 내보내기(export_output.export_outputs)가 그대로
+    의존하므로 바꾸지 않고, API 직렬화 경계인 여기서만 to_dict 직전에 결측값을
+    None(JSON null)으로 바꾼다.
+    """
+    records = df.to_dict(orient="records")
+    for record in records:
+        for key, value in record.items():
+            # df.where(df.notna(), None)으로는 안 된다 - pandas의 문자열 dtype 열은
+            # where()로 넣은 None을 자기 NA 표현으로 되돌려서 to_dict 결과에 다시
+            # float('nan')이 남는다(실측 확인됨). 그래서 to_dict 이후 값 단위로 훑어서
+            # 결측만 None으로 바꾼다.
+            if pd.isna(value):
+                record[key] = None
+    return records
 
 
 class handler(BaseHTTPRequestHandler):
@@ -232,8 +256,22 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"error": f"{type(e).__name__}: {e}"}, status=500)
 
     def _send_json(self, payload: dict, status: int = 200):
+        # allow_nan=False: NaN/Infinity가 payload에 남아있으면 여기서 바로 터뜨린다.
+        # 기본값(allow_nan=True)은 bare NaN/Infinity 토큰을 내보내는데, 그건 표준 JSON이
+        # 아니라서 브라우저 JSON.parse가 거부한다 - 응답의 status가 200이어도 화면에는
+        # 아무 판정도 뜨지 않는 방식으로 조용히 깨진다. 직렬화가 실패하면 500과 함께
+        # 사람이 읽을 수 있는 JSON 에러를 대신 돌려줘서, 이 안전장치 자체가 정상 응답을
+        # 깨뜨리는 일이 없게 한다.
+        try:
+            body = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        except ValueError as e:
+            status = 500
+            body = json.dumps(
+                {"error": f"serialization_failed: {type(e).__name__}: {e}"},
+                ensure_ascii=False,
+            ).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+        self.wfile.write(body)

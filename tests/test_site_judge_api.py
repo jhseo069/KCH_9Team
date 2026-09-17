@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -106,3 +107,42 @@ def test_law_response_never_contains_the_oc_key(monkeypatch):
     result = api.fetch_law({"law_name": ["법"], "law_article": ["제1조"]})
 
     assert "OC=" not in result["source_url"]
+
+
+def _strict_json_loads(body):
+    """json.loads는 기본적으로 NaN/Infinity 같은 비표준 상수를 관대하게 받아준다
+    (Python requests.json()도 내부적으로 이걸 써서 그동안 bare NaN 버그를 못 잡았다).
+    브라우저 JSON.parse가 실제로 거부하는 것과 같은 엄격함을 흉내내려면 parse_constant로
+    막아야 한다."""
+    def _reject(constant):
+        raise ValueError(f"non-standard JSON constant: {constant}")
+    return json.loads(body, parse_constant=_reject)
+
+
+def test_dataframe_to_json_records_is_strict_json_safe():
+    """judge()가 만든 행(note 없음)과 이격거리 행(note 있음)이 섞이면 pandas가 없는
+    값을 NaN으로 채운다 - 그 NaN이 bare로 직렬화되면 브라우저에서 파싱이 깨진다."""
+    api = load_api()
+    rows = [
+        {"raw_text": "용도지역", "status": "비저촉", "law_excerpt": "제76조", "source_url": "http://x"},
+        {"raw_text": "이격거리(조례)", "status": "판정불가", "law_excerpt": "제27조의3",
+         "source_url": "http://y", "note": "판정 기준일 2026-09-18"},
+    ]
+    df = api.generate_output_table(rows)
+
+    records = api.dataframe_to_json_records(df)
+    body = json.dumps(records, ensure_ascii=False, allow_nan=False)
+
+    parsed = _strict_json_loads(body)  # NaN이 섞여 있었다면 여기서 raise
+    assert len(parsed) == 2
+
+
+def test_dataframe_to_json_records_uses_none_not_nan_string_for_missing_note():
+    api = load_api()
+    rows = [{"raw_text": "용도지역", "status": "비저촉", "law_excerpt": "제76조", "source_url": "http://x"}]
+    df = api.generate_output_table(rows)
+
+    records = api.dataframe_to_json_records(df)
+
+    assert records[0]["비고"] is None
+    assert records[0]["비고"] != "nan"
