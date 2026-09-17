@@ -10,3 +10,6 @@ output/
 
 # scripts/build_zoning_geojson.py 입력용 원본 SHP (전국 976MB) - 커밋 대상 아님
 _gis_raw/
+
+# subagent-driven-development 작업 원장/산출물 (스크래치)
+.superpowers/
