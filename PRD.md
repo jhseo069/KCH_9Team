@@ -252,7 +252,7 @@ def export_outputs(df: "pd.DataFrame", judgment_result: list[dict], out_dir: Pat
 
 개발 중 논의를 거쳐, `law_excerpt` 스냅샷 방식의 한계("갱신되면 API가 알아서 최신을 준다"는 오해 정정)를 보완하기 위해 추가한 기능이다. 3가지 방식 중 **C안(스냅샷 + 주기적 자동 갱신 감시)**을 채택했다.
 
-- **`law_lookup.py`**: 국가법령정보센터(law.go.kr) **정식 Open API**로 법령명+조문번호 → 조문 원문(항 단위) 실시간 조회. `OC=test`(비등록 데모 접근)로 정상 동작 확인됨 — 실사용 시 `open.law.go.kr`에서 무료 등록한 본인 OC로 `.env`의 `LAW_GO_KR_OC`를 교체 권장
+- **`law_lookup.py`**: 국가법령정보센터(law.go.kr) **정식 Open API**로 법령명+조문번호 → 조문 원문(항 단위) 실시간 조회. 정식 OC 키를 `.env`의 `LAW_GO_KR_OC`에 적용 완료. 다만 시행일자별 조회(`efYd` 파라미터)는 정식 키로도 동작하지 않는 것을 확인했다
 - **`check_law_updates.py`**: `rule_table.csv`의 모든 행을 순회하며 최신 조문을 조회, 저장된 `law_excerpt`와 비교해 `new`(최초 확인)/`changed`(개정 감지)/`unchanged`/`lookup_failed`로 분류 → `data/law_update_alerts.json`에 저장. **`rule_table.csv`는 절대 자동으로 덮어쓰지 않는다** — 사람이 alerts를 보고 확정해서 반영
 - **별표(부속서) 조회 지원 (2026-09-16 추가):** law.go.kr 응답 XML에는 조문(`<조문>`)뿐 아니라 별표(`<별표>`)도 함께 포함되어 있음을 확인, `extract_appendix_number()`("별표20"→"20") + `parse_appendix()`로 별표 제목·본문(고정폭 서식 정리 포함)까지 조회 가능하도록 확장. `lookup_article_text()`가 `law_article`이 "별표"로 시작하면 자동으로 별표 조회 경로로 분기
 - **한계:** 가지번호가 있는 세부 별표(예: 별표1의2)는 현재 범위 밖 — 가지번호 `00`(대표 별표)만 지원
@@ -301,7 +301,7 @@ def export_outputs(df: "pd.DataFrame", judgment_result: list[dict], out_dir: Pat
 | `data/rule_table.csv` | 사람이 작성/관리 | 위 FR-3 컬럼 정의 |
 | `data/matching_result.json` | [3] | 위 FR-3 출력 스키마 |
 | `data/judgment_result.json` | [4] | 위 FR-4 출력 스키마 |
-| `output/final_table.csv/.xlsx` | [5] | 항목, 판정, 근거조문, 출처 |
+| `output/final_table.csv/.xlsx` | [5] | 항목, 판정, 근거조문, 출처, 비고 |
 | `output/human_review_needed.csv` | [5] | judgment_result 중 판정불가/조건부만 |
 | `data/law_update_alerts.json` | FR-6/FR-7 | 위 FR-6 참고 (new/changed/unchanged/lookup_failed) |
 | `output/run_alerts.json` | FR-8 | `{total_issues, issues: [{stage, ...}]}` |
