@@ -13,4 +13,4 @@ Vercel Python 서버리스 함수. 신재생사업본부 팀원들이 웹에서 
 - API 키 등은 Vercel 대시보드의 환경변수로만 설정한다. 절대 코드/git에 커밋하지 않는다
 
 ## 폴더 내 파일
-- `site_judge.py`: `GET /api/site_judge?address=...&project_type=...&capacity_kw=...` → `src/`의 5단계 파이프라인(브이월드 지오코딩 → eum.go.kr 시도 → 실패 시 GIS 자동 대체, 현재 전남만 가능 → 규칙 매칭 → 판정)을 실행해 4열 판정표(항목/판정/근거조문/출처) JSON 반환. 모듈 최상단 import가 실패하면(경로 문제 등) 원인을 그대로 응답으로 돌려주는 진단 로직이 들어있다.
+- `site_judge.py`: `GET /api/site_judge?address=...&project_type=...&capacity_kw=...` → `src/`의 5단계 파이프라인(브이월드 지오코딩 → eum.go.kr 시도 → 실패 시 GIS 자동 대체, 현재 전남만 가능 → 규칙 매칭 → 판정)을 실행해 5열 판정표(항목/판정/근거조문/출처/비고) JSON 반환. 모듈 최상단 import가 실패하면(경로 문제 등) 원인을 그대로 응답으로 돌려주는 진단 로직이 들어있다.

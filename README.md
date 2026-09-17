@@ -24,7 +24,7 @@
 - `data/rule_table.csv`: 규칙표 (법령 개정 시 이 파일만 수정, 코드 수정 불필요)
 - `data/matching_result.json`: 규칙 매칭 스크립트 실행 결과
 - `data/judgment_result.json`: 판정 계산 스크립트 실행 결과
-- `src/export_output.py`: **[5단계] 출력 생성** 스크립트. 4열 판정표(CSV/XLSX) + 사람 검토 목록 생성
+- `src/export_output.py`: **[5단계] 출력 생성** 스크립트. 5열 판정표(항목/판정/근거조문/출처/비고, CSV/XLSX) + 사람 검토 목록 생성
 - `output/`: 최종 판정표(`final_table.csv/.xlsx`), 사람 검토 목록(`human_review_needed.csv`)
 - `src/law_lookup.py`: 국가법령정보센터 Open API로 법령 조문 원문 실시간 조회
 - `src/gis_lookup.py`: 좌표 → 용도지역 GIS 조회. eum.go.kr 개별 주소 조회가 클라우드에서 막혀있을 때 대체 경로로 쓰인다(HANDOVER.md §5-2). 전남 지역만 지원

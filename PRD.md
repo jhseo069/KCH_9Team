@@ -54,7 +54,7 @@
 [4] 판정 계산 (규칙엔진, AI 아님)                            ✅ 구현 완료
       │                (data/judgment_result.json)
       ▼
-[5] 출력 생성  ──── 판정표 4열 + 사람 검토 목록              ✅ 구현 완료
+[5] 출력 생성  ──── 판정표 5열(비고 추가) + 사람 검토 목록   ✅ 구현 완료
                      (output/final_table.csv, .xlsx)
 ```
 
@@ -225,7 +225,7 @@ def judge(matching_result: list[dict], rule_table: "pd.DataFrame",
 **함수 시그니처:**
 ```python
 def generate_output_table(judgment_result: list[dict]) -> "pd.DataFrame":
-    """항목 | 판정 | 근거조문 | 출처 4열 DataFrame 반환"""
+    """항목 | 판정 | 근거조문 | 출처 | 비고 5열 DataFrame 반환"""
 
 def export_outputs(df: "pd.DataFrame", judgment_result: list[dict], out_dir: Path) -> None:
     """final_table.csv/.xlsx 저장 + status가 '판정불가' 또는 '조건부'인 행만
@@ -283,6 +283,16 @@ def export_outputs(df: "pd.DataFrame", judgment_result: list[dict], out_dir: Pat
 
 시스템 개요, 평소 실행 순서, 규칙표 갱신 절차(서장훈 매니저 담당), 장애 대응표(eum.go.kr 장기 차단 포함), 알려진 한계, 테스트 실행법을 정리했다.
 
+## 6-5. FR-10. 이격거리 규정 판정 (✅ 구현 완료 — [src/setback_check.py](src/setback_check.py))
+
+「신에너지 및 재생에너지 개발ㆍ이용ㆍ보급 촉진법」 제27조의3(2026-09-18 시행)에 따라 지자체 조례의 이격거리 적용이 원칙적으로 금지된다. 부지의 시군구 조례가 실제로 적용되는지를 판정해 판정표에 한 행으로 추가한다.
+
+- 조례 수치는 사람이 확정한 `data/setback_table.csv`에서 읽는다. `verified_by`가 빈 행은 판정에 쓰지 않는다
+- 판정 규칙 R1~R6은 [설계서](docs/20260916_설계_FR-10%20이격거리%20규정%20판정%20v1.0.md) §6-2 참조
+- **시행령에 이격거리 조문이 없어** 예외 범위를 확정할 수 없는 구간(R5-b)은 판정불가로 둔다
+- 반경 내 주택 실측은 범위 밖이므로 이 기능은 `저촉`을 반환하지 않는다
+- 엔진은 판정 시점의 날짜(`apply_date`)를 기록하며, 판정표 비고 열에 표시하므로 어느 기준일 기준으로 판정됐는지 확인할 수 있다
+
 ## 7. 데이터 계약 요약
 
 | 파일 | 생성 단계 | 스키마 |
@@ -334,7 +344,7 @@ def export_outputs(df: "pd.DataFrame", judgment_result: list[dict], out_dir: Pat
 > `rule_id=R00X`, `condition_type=threshold`, `threshold_field=capacity_kw`, `threshold_op=<=`, `threshold_value=1000`인 규칙에 대해 `observed_values={"capacity_kw": 990}`을 넣고 `judge()`를 실행하면 `status`가 `"비저촉"`이고, `observed_values={"capacity_kw": 1200}`을 넣으면 `status`가 `"저촉"`이다.
 
 **DoD-8 (출력 생성):**
-> 판정 항목이 3개(저촉 1, 비저촉 1, 판정불가 1) 있는 `judgment_result.json`으로 `export_outputs()`를 실행하면, `output/final_table.csv`와 `output/final_table.xlsx`가 각각 생성되고 두 파일의 행 수가 3(헤더 제외)이며, 컬럼명이 정확히 `["항목", "판정", "근거조문", "출처"]`이다.
+> 판정 항목이 3개(저촉 1, 비저촉 1, 판정불가 1) 있는 `judgment_result.json`으로 `export_outputs()`를 실행하면, `output/final_table.csv`와 `output/final_table.xlsx`가 각각 생성되고 두 파일의 행 수가 3(헤더 제외)이며, 컬럼명이 정확히 `["항목", "판정", "근거조문", "출처", "비고"]`이다.
 
 **DoD-9 (사람 검토 목록):**
 > 위와 같은 입력으로 `export_outputs()`를 실행하면, `output/human_review_needed.csv`에는 `status`가 `"판정불가"`인 1개 행만 존재하고, `"저촉"`/`"비저촉"` 행은 포함되지 않는다.
