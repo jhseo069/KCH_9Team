@@ -34,10 +34,28 @@
 - `src/check_law_updates.py`: **[FR-6] 법령 개정 감시** 스크립트. `rule_table.csv`의 조문을 최신 원문과 대조해 new/changed/unchanged/lookup_failed로 분류 → `data/law_update_alerts.json` (rule_table.csv는 자동 수정하지 않음, 사람이 확인 후 반영). `law_lookup.py`는 지자체 조례(자치법규) 조회도 지원한다(FR-7)
 - `src/run_summary.py`: **[FR-8] 파이프라인 실행 알림** 스크립트. [2]~[6]단계 결과 중 사람이 확인해야 할 항목(no_data/미매칭/판정불가·조건부/법령 changed·lookup_failed)을 모아 `output/run_alerts.json`으로 저장 + 콘솔 요약
 - `.github/workflows/`: GitHub Actions. `supabase-keepalive.yml`이 월·목 12:00(KST)에 DB를 1회 조회해 Supabase 무료 플랜 자동정지(7일 미사용)를 막는다. 상세는 HANDOVER.md §5-8
+- `ingest/parcel_contract.py`: 강경미 ParcelRecord → Supabase `parcels` 적재 행 변환기 (규제사항 원문 쪼개기 규칙 포함)
+- `public/parcel_view.js`: 필지 탭 표시 행 생성 — 실시간(용도지역)과 사전 적재(지목·면적·공시지가) 값을 합친다. 상세는 HANDOVER.md §5-9
+- `public/demo_sites.js`, `public/econ_bridge.js`: 시연용 부지 선택기, 공사비산출기(iframe) 값 주입 — 둘 다 HANDOVER.md §5-9 참고
+- `public/econ/`: 황정연 원본 공사비산출기의 **무수정 복사본**. 절대 직접 고치지 않는다 (`public/econ/README.md`, HANDOVER.md §5-9)
 - `PRD.md`: 개발용 상세 명세 (기능요구사항, 데이터 스키마, 완성 기준)
 - `HANDOVER.md`: **[FR-9] 인수인계 메모** — 실행 순서, 규칙표 갱신 절차, 장애 대응, 알려진 한계
 - `.gitignore`: venv·캐시·.env 제외 설정
 - `README.md`: 본 폴더 안내 문서 (현재 파일)
+
+## 결과 탭 구성 (2026-09-18, 3인 통합)
+
+웹앱(`public/`) 우측 결과 패널은 탭 5종이다. 강경미·황정연 두 팀원의 도구가
+통합되면서 데이터 출처가 탭마다 다르므로, 발표·시연 전에 아래 표로 확인해 둘 것
+(상세 근거는 `HANDOVER.md` §5-9).
+
+| 탭 | 내용 | 데이터 출처 | 비고 |
+|---|---|---|---|
+| 필지 | 용도지역 / 시군구 / 지목 / 면적 / 좌표 / 개별공시지가 | 용도지역은 **실시간**(Supabase `zoning`), 지목·면적·개별공시지가는 **사전 적재**(Supabase `parcels`) | eum.go.kr 라이브 조회가 서버에서 막혀 있어 지목·면적·공시지가는 실시간 경로가 없다. 미적재 좌표는 "미제공" |
+| 진단 | 저촉/비저촉/조건부/판정불가 판정표 | 실시간 (`api/site_judge.py` 파이프라인) | |
+| 이격 | 이격거리 규정 판정 | 실시간 판정 + **사전 검증된** `data/setback_table.csv` | `verified_by`가 빈 조문 행은 판정에 쓰이지 않는다(HANDOVER.md §5-6) |
+| 법령 | 관련 법령·조례 조문 원문 | 실시간 (law.go.kr Open API) | |
+| 공사비 | 계통연계 공사비 산출기 | 사람 입력 (황정연 원본 계산기, iframe) | 사업명 칸만 부지 조회 결과로 자동 채워짐. 원본 파일은 무수정 (`public/econ/README.md`) |
 
 ## 사용법
 ```bash
