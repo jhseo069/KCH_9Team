@@ -146,3 +146,67 @@ def test_dataframe_to_json_records_uses_none_not_nan_string_for_missing_note():
 
     assert records[0]["비고"] is None
     assert records[0]["비고"] != "nan"
+
+
+# ---------------------------------------------------------------------------
+# Supabase 자동정지 방지 ping
+# 무료 플랜은 7일간 DB 활동이 없으면 프로젝트를 정지시킨다. GitHub Actions가 주 2회
+# ?ping=1을 부른다. 정적 페이지나 설정 조회로는 DB 활동이 생기지 않으므로 ping은
+# 반드시 실제 조회를 1회 해야 하고, 실패하면 반드시 실패로 응답해야 한다 -
+# 조용히 200을 주면 GitHub이 알림을 안 보내고, 그대로 정지된다.
+# ---------------------------------------------------------------------------
+
+def test_ping_path_is_routed_to_the_ping_handler():
+    api = load_api()
+
+    assert api.route_for("/api/site_judge?ping=1") == "ping"
+
+
+def test_ping_value_in_other_parameters_does_not_trigger_ping():
+    """address=ping 같은 값에 걸리면 사용자의 판정 요청이 ping으로 새어버린다."""
+    api = load_api()
+
+    assert api.route_for("/api/site_judge?address=ping") == "judge"
+
+
+def test_ping_performs_a_real_zone_lookup():
+    api = load_api()
+    calls = []
+
+    def fake_lookup(lon, lat):
+        calls.append((lon, lat))
+        return {"status": "ok", "zone_name": "준주거지역"}
+
+    body, status = api.ping_database(lookup=fake_lookup)
+
+    assert calls, "DB 조회를 하지 않으면 Supabase 입장에서 활동이 없어 자동정지를 못 막는다"
+    assert status == 200
+    assert body["status"] == "ok"
+
+
+def test_ping_reports_failure_when_database_is_unreachable():
+    api = load_api()
+    from zone_db import ZoneDbUnavailable
+
+    def failing_lookup(lon, lat):
+        raise ZoneDbUnavailable("용도지역 DB 오류 HTTP 503")
+
+    body, status = api.ping_database(lookup=failing_lookup)
+
+    assert status == 503
+    assert body["status"] == "error"
+    assert "503" in body["reason"]
+
+
+def test_ping_reports_failure_when_known_coordinate_finds_nothing():
+    """DB는 살아있는데 테이블이 비었거나 망가진 경우도 잡는다.
+
+    ping 좌표는 데이터에 반드시 있는 지점이다. 거기서 아무것도 안 나오면
+    접속은 되더라도 판정은 전부 틀어진 상태이므로 실패로 알린다.
+    """
+    api = load_api()
+
+    body, status = api.ping_database(lookup=lambda lon, lat: {"status": "no_match", "reason": "없음"})
+
+    assert status == 503
+    assert body["status"] == "error"

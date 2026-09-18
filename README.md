@@ -33,6 +33,7 @@
 - `public/map_utils.js`: 지도 표시용 순수 함수(줌별 단순화 강도, 용도지역 색 매핑). `node --test tests/map_utils.test.js`로 검증
 - `src/check_law_updates.py`: **[FR-6] 법령 개정 감시** 스크립트. `rule_table.csv`의 조문을 최신 원문과 대조해 new/changed/unchanged/lookup_failed로 분류 → `data/law_update_alerts.json` (rule_table.csv는 자동 수정하지 않음, 사람이 확인 후 반영). `law_lookup.py`는 지자체 조례(자치법규) 조회도 지원한다(FR-7)
 - `src/run_summary.py`: **[FR-8] 파이프라인 실행 알림** 스크립트. [2]~[6]단계 결과 중 사람이 확인해야 할 항목(no_data/미매칭/판정불가·조건부/법령 changed·lookup_failed)을 모아 `output/run_alerts.json`으로 저장 + 콘솔 요약
+- `.github/workflows/`: GitHub Actions. `supabase-keepalive.yml`이 월·목 12:00(KST)에 DB를 1회 조회해 Supabase 무료 플랜 자동정지(7일 미사용)를 막는다. 상세는 HANDOVER.md §5-8
 - `PRD.md`: 개발용 상세 명세 (기능요구사항, 데이터 스키마, 완성 기준)
 - `HANDOVER.md`: **[FR-9] 인수인계 메모** — 실행 순서, 규칙표 갱신 절차, 장애 대응, 알려진 한계
 - `.gitignore`: venv·캐시·.env 제외 설정

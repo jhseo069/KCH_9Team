@@ -12,6 +12,7 @@ query_site_data.resolve_zone_info()가 자동으로 GIS 좌표 기반 조회(현
 import json
 import os
 import sys
+import time
 from datetime import date
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
@@ -35,6 +36,7 @@ try:
     from match_regulations import match_regulations  # noqa: E402
     from query_site_data import query_site  # noqa: E402
     from setback_check import check_setback, to_judgment_row, unevaluated_judgment_row  # noqa: E402
+    from zone_db import ZoneDbUnavailable, find_zone_in_db  # noqa: E402
 except Exception as e:
     IMPORT_ERROR = {
         "type": f"{type(e).__name__}: {e}",
@@ -86,7 +88,43 @@ def route_for(path: str) -> str:
     404) 서브패스가 아니라 쿼리 파라미터(law=1)로 분기한다. 값이 아니라 파라미터
     존재 자체로 판단하므로 address=law 같은 값은 걸리지 않는다.
     """
-    return "law" if "law" in parse_qs(urlparse(path).query) else "judge"
+    params = parse_qs(urlparse(path).query)
+    if "ping" in params:
+        return "ping"
+    if "law" in params:
+        return "law"
+    return "judge"
+
+
+# 자동정지 방지 ping이 조회하는 좌표: 목포시 시가지(준주거지역). 적재된 데이터에 반드시
+# 있는 지점이어야 한다 - 여기서 아무것도 안 나오면 DB가 망가졌다는 신호로 쓴다.
+PING_LON, PING_LAT = 126.3922, 34.8118
+
+
+def ping_database(lookup=None):
+    """Supabase 무료 플랜 자동정지(7일간 DB 활동 없음) 방지용 실제 조회 1회.
+
+    GitHub Actions(.github/workflows/supabase-keepalive.yml)가 주 2회 호출한다.
+    반환: (응답 본문, HTTP 상태코드).
+
+    실패를 조용히 삼키면 안 된다. 여기서 200을 주면 GitHub이 알림을 보내지 않고,
+    아무도 모르는 사이 프로젝트가 정지된다. 조회 실패뿐 아니라 '접속은 되는데
+    알려진 좌표에서 아무것도 안 나오는' 경우(테이블이 비었거나 망가짐)도 실패로 본다.
+    """
+    lookup = lookup or find_zone_in_db
+    started = time.perf_counter()
+    try:
+        result = lookup(PING_LON, PING_LAT)
+    except ZoneDbUnavailable as e:
+        return {"status": "error", "reason": str(e)}, 503
+
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    if result.get("status") != "ok":
+        return {
+            "status": "error",
+            "reason": f"알려진 좌표에서 용도지역이 조회되지 않음({result.get('status')}) - 데이터 점검 필요",
+        }, 503
+    return {"status": "ok", "zone": result.get("zone_name"), "elapsed_ms": elapsed_ms}, 200
 
 
 def fetch_law(query: dict) -> dict:
@@ -197,6 +235,14 @@ def dataframe_to_json_records(df: "pd.DataFrame") -> list:
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
+
+        if route_for(self.path) == "ping":
+            if IMPORT_ERROR is not None:
+                self._send_json({"status": "error", "reason": "서버 모듈 로드 실패"}, status=500)
+                return
+            body, status = ping_database()
+            self._send_json(body, status=status)
+            return
 
         if route_for(self.path) == "law":
             if IMPORT_ERROR is not None:

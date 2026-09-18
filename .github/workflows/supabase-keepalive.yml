@@ -1,0 +1,47 @@
+# Supabase 자동정지 방지
+#
+# 무료 플랜은 7일간 DB 활동이 없으면 프로젝트를 정지시킨다. 정지되면 용도지역 조회가
+# 전부 실패해 판정이 판정불가로만 나온다. 주 2회 실제 DB 조회를 일으켜 이를 막는다.
+#
+# Supabase를 직접 부르지 않고 우리 API(?ping=1)를 거친다. 그래야 Supabase 키를
+# GitHub Secrets에 또 복사해둘 필요가 없다 - 비밀정보가 한 군데도 늘지 않는다.
+#
+# 실패하면 반드시 job을 실패시킨다. 조용히 넘어가면 GitHub이 알림을 보내지 않고,
+# 아무도 모르는 사이 정지된다. 이미 정지된 프로젝트는 API로 깨울 수 없으므로
+# 실패 알림을 받으면 Supabase 대시보드에서 직접 Restore 해야 한다(HANDOVER.md §5-8).
+
+name: Supabase keepalive
+
+on:
+  schedule:
+    # 월·목 03:00 UTC = 12:00 KST. 정지 기준이 7일이라 주 1회면 한 번만 실패해도
+    # 바로 넘긴다. 월·목이면 최대 간격이 4일이라 한 번 실패해도 여유가 있다.
+    - cron: "0 3 * * 1,4"
+  # Actions 탭에서 수동으로 돌려볼 수 있게 한다
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 앱을 통해 DB 조회 1회
+        env:
+          PING_URL: https://kch-9-team.vercel.app/api/site_judge?ping=1
+        run: |
+          # Vercel 콜드스타트나 일시 오류로 첫 시도가 실패할 수 있어 3번까지 재시도한다
+          for attempt in 1 2 3; do
+            response=$(curl -sS --max-time 30 -w '\n%{http_code}' "$PING_URL" || echo $'\n000')
+            code=$(printf '%s' "$response" | tail -n1)
+            body=$(printf '%s' "$response" | sed '$d')
+            echo "시도 $attempt: HTTP $code $body"
+
+            if [ "$code" = "200" ] && printf '%s' "$body" | jq -e '.status == "ok"' > /dev/null; then
+              echo "DB 활동 기록 완료"
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+
+          echo "::error title=Supabase keepalive 실패::DB 조회가 3번 모두 실패했습니다. 프로젝트가 이미 정지됐을 수 있습니다 - Supabase 대시보드에서 확인하세요."
+          exit 1

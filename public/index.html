@@ -301,7 +301,7 @@
         }).bindTooltip(escapeHtml(row.zone_name), { sticky: true });
       })).addTo(leafletMap);
 
-      // 3,000건에서 잘렸을 수 있다. 조용히 자르면 사용자가 빈 곳을 보고
+      // MAX_ZONING_ROWS(1,000, 서버 상한)에서 잘렸을 수 있다. 조용히 자르면 사용자가 빈 곳을 보고
       // "용도지역이 없는 땅"으로 오해한다.
       notice(rows.length >= MAX_ZONING_ROWS
         ? "이 범위에는 표시할 수 있는 것보다 많은 구역이 있습니다 — 확대하세요" : "");
