@@ -184,6 +184,12 @@ def test_multiple_rows_with_a_distance_row_ignore_row_order():
 
 
 def test_multiple_distance_rows_pick_most_restrictive_regardless_of_order():
+    """이격거리는 클수록 엄격하다 - 더 멀리 떨어져야 하므로 입지할 수 있는 땅이 줄어든다.
+
+    2026-09-18 이전에는 이 테스트가 50m(작은 쪽)를 '가장 엄격한' 조문으로 고정하고
+    있었다. 그 결과 판정표가 주택 100m 규정이 있는 시군에서도 공공시설 50m 조문을
+    근거로 인용해, 실제로 넘어야 할 제약을 절반으로 보여주고 있었다.
+    """
     flags = {"역사문화환경보존지역": False, "생태경관보전지역": False}
 
     forward = check_setback("12130", "태양광", AFTER, [], flags,
@@ -191,10 +197,27 @@ def test_multiple_distance_rows_pick_most_restrictive_regardless_of_order():
     reversed_ = check_setback("12130", "태양광", AFTER, [], flags,
                                _table([YEOSU_PUBLIC_50M, YEOSU_HOUSE_100M]))
 
-    assert forward["ordinance"]["distance_m"] == 50
-    assert reversed_["ordinance"]["distance_m"] == 50
+    assert forward["ordinance"]["distance_m"] == 100
+    assert reversed_["ordinance"]["distance_m"] == 100
     assert "2건" in forward["reason"]
     assert "2건" in reversed_["reason"]
+    assert forward["reason"] == reversed_["reason"]
+
+
+def test_equal_distance_rows_cite_the_same_article_regardless_of_order():
+    """최댓값이 둘 이상이면 어느 조문을 인용할지가 CSV 행 순서에 따라 흔들리면 안 된다.
+
+    같은 입력에 대해 판정표에 적히는 근거 조문이 매번 달라지면 사람이 검토할 수 없다.
+    """
+    flags = {"역사문화환경보존지역": False, "생태경관보전지역": False}
+    public_100 = dict(YEOSU_PUBLIC_50M, distance_m="100")
+
+    forward = check_setback("12130", "태양광", AFTER, [], flags,
+                             _table([YEOSU_HOUSE_100M, public_100]))
+    reversed_ = check_setback("12130", "태양광", AFTER, [], flags,
+                               _table([public_100, YEOSU_HOUSE_100M]))
+
+    assert forward["ordinance"]["article"] == reversed_["ordinance"]["article"]
     assert forward["reason"] == reversed_["reason"]
 
 

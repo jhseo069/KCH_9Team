@@ -208,7 +208,7 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
     # C1. 시군구 하나에 여러 조례 행(도로/주택/공공시설 등 target별)이 있을 수 있다.
     # distance_m이 있는 행과 없는 행을 나눠서, "확인된 모든 행이 이격거리 없음에
     # 동의하는 경우"에만 R3(비저촉)으로 확정한다. 하나라도 이격거리가 있으면 CSV
-    # 행 순서와 무관하게 가장 엄격한(distance_m이 가장 작은) 행을 적용한다.
+    # 행 순서와 무관하게 가장 엄격한(distance_m이 가장 큰) 행을 적용한다.
     rows_with_distance = []
     rows_without_distance = []
     for _, candidate in matched.iterrows():
@@ -239,9 +239,12 @@ def check_setback(sgg_cd, project_type, apply_date, exemptions, zone_flags, setb
             "apply_date": apply_date.isoformat(),
         }
 
-    # 가장 엄격한(최댓값 이격거리) 행을 적용한다. sort_values로 이미 안정 정렬을
-    # 해뒀으므로 distance_m이 같은 행이 여럿이어도 결과는 결정적이다.
-    rows_with_distance.sort(key=lambda pair: pair[1]["distance_m"])
+    # 가장 엄격한(최댓값 이격거리) 행을 적용한다. 이격거리는 클수록 더 멀리 떨어져야
+    # 하므로 입지 가능한 땅이 줄어든다 - 작은 값을 인용하면 실제 제약을 과소하게
+    # 보여준다(2026-09-18 이전에는 오름차순으로 가장 작은 값을 인용하고 있었다).
+    # sort_values로 이미 조문·대상 순 안정 정렬을 해뒀고 파이썬 정렬은 reverse=True
+    # 에서도 안정적이므로, distance_m이 같은 행이 여럿이어도 결과는 결정적이다.
+    rows_with_distance.sort(key=lambda pair: pair[1]["distance_m"], reverse=True)
     row, ordinance = rows_with_distance[0]
     # C1. 여러 조문이 매칭됐다면 어느 것을 적용했는지, 나머지도 있다는 사실이 이유
     # 문구(reason)에 드러나야 한다 - 사람이 판정표만 보고도 "확인해야 할 조문이 더
