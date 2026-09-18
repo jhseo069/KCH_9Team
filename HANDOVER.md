@@ -221,6 +221,26 @@ Supabase를 직접 부르지 않고 우리 API를 거치는 이유: 그래야 Su
   아니라 조용히 비어 보이므로, 새 부지를 다룰 때마다 이 스크립트를 돌렸는지 스스로
   체크하는 습관이 필요하다
 
+**`ingest/parcel_contract.py`의 `lon`/`lat`은 아직 아무도 채워주지 않는다.** `parcel_record_to_row(record, lon=..., lat=...)`와
+`scripts/load_parcels_to_supabase.py`는 좌표 인자를 받게 만들어져 있지만, 강경미
+`토지조서자동화` 프로젝트(이 저장소 밖, 별도 프로젝트)의 실제 `ParcelRecord`에는
+좌표 필드가 아예 없고 그 파이프라인은 XLSX를 산출한다 — JSON에 좌표가 실려 오는
+경로가 지금 존재하지 않는다. 좌표를 구해오는 로직 자체는 그 프로젝트의
+`vworld_client.search_pnu`가 이미 브이월드에서 x/y를 받아오고 있지만, 지금은 그
+값을 캐시 파일에만 남기고 레코드에는 붙이지 않는다 — 다음 세션에서 `search_pnu`가
+받은 x/y를 `ParcelRecord`에 붙여 이 저장소로 넘어오게 하는 게 메워야 할 간극이다.
+`scripts/load_parcels_to_supabase.py`는 이제 좌표 없는 행이 몇 건인지 경고를
+찍지만(`load_records`), 이는 조용한 실패를 막을 뿐 근본 해결이 아니다 — **좌표가
+없는 행은 아무리 다른 필드가 채워져 있어도 필지 탭에 영원히 나타나지 않는다.**
+`parcel_at`이 `parcels` 테이블을 읽는 유일한 경로이고, 그 함수가 `where p.geom is
+not null`로 걸러내기 때문이다.
+
+**`규제사항_원문`은 적재만 되고 판정에는 아직 쓰이지 않는다.** `ingest/parcel_contract.py`가
+쪼개서 `parcels.규제사항_원문`에 저장은 하지만, `api/site_judge.py`의 판정 로직은
+이 필드를 읽지 않는다(판정은 여전히 `data/rule_table.csv`/`zoning` 기반 규칙표만
+본다) — 적재됐다는 사실을 시연에서 "이 값도 판정에 반영된다"는 뜻으로 말하지
+않도록 주의할 것.
+
 **`public/econ/`의 파일은 황정연 님 원본의 복사본이며 절대 수정하지 않는다.**
 `public/econ/README.md`에 상세 규칙이 있다: 이 폴더를 열어 코드를 고치는 일 자체를
 하지 않고, 원본이 갱신되면 **파일 전체를 새 버전 파일명으로 통째로 교체**한다(예:

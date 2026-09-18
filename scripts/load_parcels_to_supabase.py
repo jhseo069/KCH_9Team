@@ -41,6 +41,22 @@ def load_records(
     records: list[dict], supabase_url: str, secret_key: str, batch_size: int = 500
 ) -> int:
     rows = build_rows(records)
+
+    # lon/lat이 없는 행은 geom이 null로 적재된다. parcel_at()은
+    # `where p.geom is not null`로 걸러내므로, 이런 행은 Supabase에 올라가도 앱
+    # 화면(필지 탭)에는 영원히 나타나지 않는다 - 그런데 이 스크립트는 "적재 완료:
+    # N건"만 찍고 끝나서, 사람이 보기엔 성공한 것처럼 보인다. 강경미 ParcelRecord에는
+    # 원래 좌표 필드가 없어(별도 토지조서자동화 프로젝트 산출물) 이 조건이 항상 참일
+    # 수 있다 - 조용히 넘어가면 "적재했는데 화면엔 안 보인다"는 문제를 아무도 못 알아챈다.
+    missing_coords = sum(1 for r in rows if r.get("lon") is None and r.get("lat") is None)
+    if missing_coords > 0:
+        print(
+            f"경고: {missing_coords}건은 좌표(lon/lat)가 없다 - 이 행들은 Supabase에 "
+            "적재되어도 parcel_at()이 geom is not null로 걸러내기 때문에 필지 탭에 "
+            "영원히 나타나지 않는다. HANDOVER.md §5-9 참고.",
+            file=sys.stderr,
+        )
+
     endpoint = supabase_url.rstrip("/") + "/rest/v1/rpc/upsert_parcels_batch"
     total = 0
     for batch in build_batches(rows, batch_size):
