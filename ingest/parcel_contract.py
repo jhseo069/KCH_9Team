@@ -22,6 +22,13 @@ _SPLIT_PATTERN = re.compile(r"[,;\n](?![^(]*\))")
 def split_regulations(raw: str | None) -> list[str]:
     if not raw:
         return []
+    # 괄호 개수가 안 맞으면 원문이 잘렸거나 손상된 것으로 본다. 이 상태로 정규식을
+    # 적용하면 lookahead가 닫는 괄호를 못 찾아 괄호 안 구분자까지 쪼개버리고,
+    # 그러면 아무도 쓰지 않은 규제 항목이 생겨난다 — 쪼개지 않고 통째로 반환해
+    # 판정 쪽에서 "미매칭"으로 걸러지게 둔다.
+    if raw.count("(") != raw.count(")"):
+        stripped = raw.strip()
+        return [stripped] if stripped else []
     parts = (p.strip() for p in _SPLIT_PATTERN.split(raw))
     return [p for p in parts if p]
 
