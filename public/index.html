@@ -100,6 +100,9 @@
   <aside id="panel-left">
     <form id="judge-form">
       <p class="sect">사업 조건</p>
+      <label for="demoPick">시연용 부지</label>
+      <select id="demoPick"><option value="">— 직접 입력 —</option></select>
+
       <div class="row">
         <div>
           <label for="project_type">사업 종류</label>
@@ -157,6 +160,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="/map_utils.js"></script>
 <script src="/parcel_view.js"></script>
+<script src="/demo_sites.js"></script>
 <script>
   const { shouldLoadZoning, toleranceForZoom, categoryColor, ZONE_CATEGORIES } = window.MapUtils;
 
@@ -198,6 +202,7 @@
         ).addTo(leafletMap);
       }
       loadZoning();
+      loadDemoSites();
     })
     .catch(function () { notice("지도 설정을 불러오지 못했습니다. 새로고침해 주세요."); });
 
@@ -335,6 +340,39 @@
     } catch (e) {
       return null;   // 사전 적재 데이터가 없는 것은 실패가 아니다. 미제공으로 표시된다
     }
+  }
+
+  // 좌표를 미리 저장해 둔 시연용 부지 목록. 목록/조회 자체가 실패해도(설정 없음,
+  // 네트워크 오류, 빈 테이블) 조용히 빠져나간다 - 이 선택기가 없어도 직접 주소 입력
+  // 경로는 그대로 동작해야 한다(시연 안전망이지 필수 기능이 아니다).
+  async function loadDemoSites() {
+    if (!cfg.supabase_url || !cfg.supabase_key) return;
+    try {
+      const res = await fetch(cfg.supabase_url.replace(/\/$/, "") +
+        "/rest/v1/demo_sites?select=*&order=display_ord", {
+        headers: { "apikey": cfg.supabase_key, "Authorization": "Bearer " + cfg.supabase_key },
+      });
+      if (!res.ok) return;
+      const sites = await res.json();
+      const sel = document.getElementById("demoPick");
+      sites.forEach(function (s, i) {
+        const o = document.createElement("option");
+        o.value = String(i);
+        o.textContent = s.site_name;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", function () {
+        if (sel.value === "") return;
+        const q = DemoSites.buildDemoQuery(sites[Number(sel.value)]);
+        // runWithQuery는 #address 입력란을 건드리지 않는다 - 직접 입력 경로에서는 그게
+        // 맞다(사용자가 타이핑한 값을 지오코딩 정제 주소로 조용히 덮어쓰면 안 되므로).
+        // 하지만 시연 부지 경로는 사용자가 이 필드에 아무것도 타이핑하지 않았으므로,
+        // 여기서 동기화하지 않으면 재판정 버튼을 누를 때 이 필드의 옛 값(보통 빈 값 →
+        // "지도에서 선택한 지점")으로 라벨이 조용히 바뀐다. 이 경로에서만 값을 채운다.
+        document.getElementById("address").value = q.address;
+        runWithQuery(q);
+      });
+    } catch (e) { /* 시연용 목록이 없어도 직접 입력 경로는 그대로 동작한다 */ }
   }
 
   leafletMap.on("moveend", loadZoning);

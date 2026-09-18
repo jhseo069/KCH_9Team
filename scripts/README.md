@@ -14,3 +14,4 @@
 - eum.go.kr이 이 데이터를 주기적으로 갱신하므로(고시·변경 반영), 정확도를 유지하려면 몇 달에 한 번씩 재실행을 권장한다.
 - `collect_setback_draft.py`: 전남 22개 시군구 도시계획 조례에서 이격거리 조문 초안을 수집해 `../data/setback_table_draft.csv`로 저장한다. 수집 결과는 `verified_by`가 비어 있는 **초안**이며, 사람이 조문을 읽고 수치를 확정해 `../data/setback_table.csv`로 옮겨야 판정에 반영된다.
 - `supabase_schema_parcels.sql`: 필지·시연부지 테이블 정의 (Supabase / PostGIS). `supabase_schema.sql`(zoning)과 별도 파일이며, 같은 보안 패턴(공개 키는 읽기만, 적재는 secret 키 전용 함수로)을 따른다.
+- `demo_sites_seed.sql`: 시연용 부지 3건을 `demo_sites`에 넣는 insert문. **실행 전 반드시 lon/lat 자리표시자를 parcels 테이블에 실제로 적재된 좌표로 교체할 것** — 안 바꾸면 시연 중 필지 탭이 "미제공"으로 뜬다(이 과제가 막으려던 사고 그대로).
