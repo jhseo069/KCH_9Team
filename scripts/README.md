@@ -15,3 +15,5 @@
 - `collect_setback_draft.py`: 전남 22개 시군구 도시계획 조례에서 이격거리 조문 초안을 수집해 `../data/setback_table_draft.csv`로 저장한다. 수집 결과는 `verified_by`가 비어 있는 **초안**이며, 사람이 조문을 읽고 수치를 확정해 `../data/setback_table.csv`로 옮겨야 판정에 반영된다.
 - `supabase_schema_parcels.sql`: 필지·시연부지 테이블 정의 (Supabase / PostGIS). `supabase_schema.sql`(zoning)과 별도 파일이며, 같은 보안 패턴(공개 키는 읽기만, 적재는 secret 키 전용 함수로)을 따른다.
 - `demo_sites_seed.sql`: 시연용 부지 3건을 `demo_sites`에 넣는 insert문. **실행 전 반드시 lon/lat 자리표시자를 parcels 테이블에 실제로 적재된 좌표로 교체할 것** — 안 바꾸면 시연 중 필지 탭이 "미제공"으로 뜬다(이 과제가 막으려던 사고 그대로).
+- `load_parcels_to_supabase.py`: 강경미 토지조서 파이프라인 산출물(JSON)을 `ingest/parcel_contract.py`로 변환해 Supabase `parcels` 테이블에 적재하는 배치. **로컬에서만, 사람이 손으로** 실행한다 — 등기부등본처럼 클라우드에서 재생성할 수 없는 출처가 섞여 있기 때문이다. 시연 직전과 새 부지가 추가될 때마다 실행한다. 상세는 `HANDOVER.md` §5-9. 실행: `python scripts/load_parcels_to_supabase.py <토지조서_결과.json>`
+- `demo_smoke_check.py`: 시연 직전 점검 스크립트. 배포된 판정 API, 필지 조회(`parcel_at`), 시연용 부지 목록(`demo_sites`) 세 가지가 실제로 응답하는지 확인하고 하나라도 실패하면 종료 코드 1을 낸다. `demo_sites_seed.sql`의 좌표가 자리표시자 그대로면 필지 조회 항목이 실패로 나온다 — 정상 동작이다. 실행: `python scripts/demo_smoke_check.py https://<배포도메인>`
