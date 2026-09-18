@@ -156,6 +156,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="/map_utils.js"></script>
+<script src="/parcel_view.js"></script>
 <script>
   const { shouldLoadZoning, toleranceForZoom, categoryColor, ZONE_CATEGORIES } = window.MapUtils;
 
@@ -312,6 +313,30 @@
     }
   }
 
+  // 지목·면적·공시지가는 eum.go.kr을 서버에서 막아 얻을 수 없으므로, 사전 조사해
+  // 적재해둔 parcels 테이블에서 대신 채운다(zoning_in_bbox와 같은 방식 - Vercel 함수
+  // 호출 한도를 건드리지 않는다). 적재되지 않은 지점은 실패가 아니라 "미제공"이 맞는
+  // 결과라서, 어떤 이유로 못 가져오든 조용히 null을 돌려준다.
+  async function fetchParcel(lon, lat) {
+    if (!cfg.supabase_url || !cfg.supabase_key) return null;
+    try {
+      const res = await fetch(cfg.supabase_url.replace(/\/$/, "") + "/rest/v1/rpc/parcel_at", {
+        method: "POST",
+        headers: {
+          "apikey": cfg.supabase_key,
+          "Authorization": "Bearer " + cfg.supabase_key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ in_lon: lon, in_lat: lat, radius_m: 50 }),
+      });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return rows.length ? rows[0] : null;
+    } catch (e) {
+      return null;   // 사전 적재 데이터가 없는 것은 실패가 아니다. 미제공으로 표시된다
+    }
+  }
+
   leafletMap.on("moveend", loadZoning);
   document.getElementById("layer-zoning").addEventListener("change", loadZoning);
   document.getElementById("layer-satellite").addEventListener("change", function () {
@@ -352,6 +377,17 @@
     judge(e.latlng.lng, e.latlng.lat, "지도에서 선택한 지점");
   });
 
+  // 지오코딩 뒤에 하는 일만 뽑아둔 것 - 주소 검색은 지오코딩부터 해서 이걸 부르고,
+  // 좌표를 이미 아는 시연용 부지 선택(다음 과제)은 지오코딩을 건너뛰고 바로 이걸 부른다.
+  // project_type/capacity_kw는 넘어오지 않으면(기존 주소 검색 경로) 폼 값을 그대로
+  // 둔다 - 기존 동작을 바꾸지 않기 위해서다.
+  async function runWithQuery(q) {
+    leafletMap.setView([q.lat, q.lon], 17);
+    if (q.project_type != null) document.getElementById("project_type").value = q.project_type;
+    if (q.capacity_kw != null) document.getElementById("capacity_kw").value = q.capacity_kw;
+    await judge(q.lon, q.lat, q.address);
+  }
+
   document.getElementById("addr-search").addEventListener("submit", async function (e) {
     e.preventDefault();
     const address = document.getElementById("address").value.trim();
@@ -359,8 +395,7 @@
     msgEl.textContent = "좌표 변환 중...";
     const geo = await geocodeJsonp(address);
     if (!geo.ok) { msgEl.textContent = "주소 조회 실패: " + geo.reason; return; }
-    leafletMap.setView([geo.lat, geo.lon], 17);
-    judge(geo.lon, geo.lat, geo.refined_addr || address);
+    await runWithQuery({ address: geo.refined_addr || address, lon: geo.lon, lat: geo.lat });
   });
 
   document.getElementById("judge-form").addEventListener("submit", function (e) {
@@ -395,8 +430,10 @@
       const data = await res.json();
       if (myId !== judgeRequestId) return;   // 더 새로운 판정 요청이 진행 중
       if (!res.ok || data.error) { msgEl.textContent = "오류: " + (data.error || res.status); return; }
+      const parcel = await fetchParcel(lon, lat);
+      if (myId !== judgeRequestId) return;   // 필지 조회하는 동안 더 새로운 요청이 시작됐을 수 있다
       lastData = data;
-      renderResult(data, label);
+      renderResult(data, label, parcel);
       msgEl.textContent = "";
     } catch (err) {
       if (myId !== judgeRequestId) return;
@@ -406,7 +443,7 @@
     }
   }
 
-  function renderResult(data, label) {
+  function renderResult(data, label, parcel) {
     panelRight.hidden = false;
     const eum = data.eum || {};
     const zones = eum.zone_national_law || [];
@@ -422,7 +459,7 @@
     }
 
     renderDiagnosis(data);
-    renderParcel(data, label);
+    renderParcel(data, label, parcel);
     renderSetback(data);
     document.getElementById("tab-법령").innerHTML = '<p class="foot">탭을 열면 조문을 불러옵니다.</p>';
     switchTab("진단");
@@ -457,21 +494,15 @@
       '<p class="foot">※ "조건부"/"판정불가"는 사람 검토가 필요합니다. 조문 원문은 법령 탭에 있습니다.</p>';
   }
 
-  function renderParcel(data, label) {
-    const eum = data.eum || {}, v = data.vworld || {};
-    const rows = [
-      ["주소", label],
-      ["용도지역", (eum.zone_national_law || []).join(", ") || "-"],
-      ["시군구", (eum.sgg_nm || "-") + " (" + (eum.sgg_cd || "-") + ")"],
-      ["지목", eum.jimok_code || "미제공"],
-      ["면적", eum.area_sqm || "미제공"],
-      ["좌표", v.lon ? v.lon.toFixed(6) + ", " + v.lat.toFixed(6) : "-"],
-      ["조회 경로", eum.source === "gis" ? "용도지역 DB (GIS)" : "토지이음"],
-    ];
+  function renderParcel(data, label, parcel) {
+    const rows = ParcelView.buildParcelRows(data, label, parcel);
     document.getElementById("tab-필지").innerHTML = "<dl>" + rows.map(function (r) {
-      return "<div><dt>" + escapeHtml(r[0]) + "</dt><dd>" + escapeHtml(String(r[1])) + "</dd></div>";
+      return "<div><dt>" + escapeHtml(r.label) + "</dt><dd>" +
+        escapeHtml(String(r.value)) +
+        (r.source ? ' <span class="src">(' + escapeHtml(r.source) + ")</span>" : "") +
+        "</dd></div>";
     }).join("") + "</dl>" +
-      '<p class="foot">지목·면적은 토지이음 조회가 성공한 경우에만 표시됩니다.</p>';
+      '<p class="foot">지목·면적·공시지가는 사전 조사해 적재한 부지 데이터입니다. 조회 시점은 출처 표기를 확인하세요.</p>';
   }
 
   function renderSetback(data) {
