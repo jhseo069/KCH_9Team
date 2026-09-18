@@ -67,6 +67,14 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 적재용 (secret 키 전용) — insert_zoning_batch와 같은 방식
 -- ---------------------------------------------------------------------------
+-- 경고: 규제사항_원문/실패사유/데이터출처 세 필드는 각 행에서 JSON 배열(빈 배열 '[]'은
+-- 괜찮음)로 와야 한다. jsonb_array_elements_text는 스칼라를 받으면 예외를 던지는데,
+-- 이 함수는 rows 전체를 하나의 insert 문으로 묶어 실행하므로 그 예외가 나면 트랜잭션이
+-- 통째로 롤백된다 — 문제 있는 필지 1건이 아니라 같은 배치에 함께 보낸 정상 필지까지
+-- 전부 못 들어간다. 따라서 이 세 필드에 명시적 null을 담아 보내면 배치 전체가 실패한다
+-- (키를 아예 빼는 것은 괜찮다 — 이 함수가 coalesce로 빈 배열로 채운다). 이 보장은
+-- 호출자(scripts/load_parcels_to_supabase.py, ingest/parcel_contract.py) 쪽 책임이며
+-- 여기서는 검증하지 않는다.
 create or replace function upsert_parcels_batch(rows jsonb)
 returns integer
 language sql as $$
