@@ -55,6 +55,7 @@
   #tab-bar button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
   .tabpane{padding:13px;display:none}
   .tabpane.on{display:block}
+  #tab-공사비{padding:0}
   #result-head{padding:13px 13px 0;font-size:12.5px;color:var(--muted)}
   #result-head .zone{display:block;font-size:15px;color:var(--ink);font-weight:700;margin-top:3px}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -148,11 +149,18 @@
       <button type="button" data-tab="필지" aria-selected="false">필지</button>
       <button type="button" data-tab="법령" aria-selected="false">법령</button>
       <button type="button" data-tab="이격" aria-selected="false">이격</button>
+      <button type="button" data-tab="공사비" aria-selected="false">공사비</button>
     </div>
     <div class="tabpane on" id="tab-진단"></div>
     <div class="tabpane" id="tab-필지"></div>
     <div class="tabpane" id="tab-법령"></div>
     <div class="tabpane" id="tab-이격"></div>
+    <div class="tabpane" id="tab-공사비">
+      <!-- 황정연 원본(public/econ/README.md 참고)을 무수정으로 담는 iframe.
+           같은 출처라 load 후 contentDocument로 사업명만 채운다(아래 applyEconContext). -->
+      <iframe id="econFrame" src="econ/20260916_신재생공사비산출기_v1.3.html"
+              title="신재생 공사비 산출기" style="width:100%;height:70vh;border:0"></iframe>
+    </div>
   </aside>
 
 </div>
@@ -161,6 +169,7 @@
 <script src="/map_utils.js"></script>
 <script src="/parcel_view.js"></script>
 <script src="/demo_sites.js"></script>
+<script src="/econ_bridge.js"></script>
 <script>
   const { shouldLoadZoning, toleranceForZoom, categoryColor, ZONE_CATEGORIES } = window.MapUtils;
 
@@ -395,6 +404,18 @@
   const msgEl = document.getElementById("form-msg");
   let lastData = null;
 
+  // 공사비 iframe(econ/) 쪽 사업명 칸에 조회한 부지 정보를 채운다. 원본 HTML은 절대
+  // 수정하지 않는다는 제약 때문에 postMessage 대신, 같은 출처(same-origin)인 점을
+  // 이용해 로드 완료 후 contentDocument로 직접 값을 써넣는다(econ/README.md 참고).
+  let lastSiteMeta = null;
+  function applyEconContext() {
+    const frame = document.getElementById("econFrame");
+    if (!frame || !frame.contentDocument || !lastSiteMeta) return;
+    const el = frame.contentDocument.getElementById("projName");
+    if (el) el.value = EconBridge.buildEconContext(lastSiteMeta).projName;
+  }
+  document.getElementById("econFrame").addEventListener("load", applyEconContext);
+
   document.getElementById("tab-bar").addEventListener("click", function (e) {
     const btn = e.target.closest("button[data-tab]");
     if (btn) switchTab(btn.dataset.tab);
@@ -423,6 +444,10 @@
     leafletMap.setView([q.lat, q.lon], 17);
     if (q.project_type != null) document.getElementById("project_type").value = q.project_type;
     if (q.capacity_kw != null) document.getElementById("capacity_kw").value = q.capacity_kw;
+    // 공사비 탭의 사업명 자동 채움도 여기서 함께 건다 - iframe이 아직 로드 전이면
+    // load 이벤트가 다시 applyEconContext를 불러주므로 순서는 상관없다.
+    lastSiteMeta = q;
+    applyEconContext();
     await judge(q.lon, q.lat, q.address);
   }
 

@@ -1,0 +1,1720 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>신재생 공사비 산출기 — 전기공사</title>
+<style>
+:root{
+  --bg:#f4f6fb; --card:#fff; --line:#e4e8f0; --line2:#eef1f6;
+  --ink:#0f172a; --ink2:#334155; --muted:#64748b; --faint:#94a3b8;
+  --acc:#2563eb; --acc2:#1d4ed8; --acc-soft:#eef3ff;
+  --c-wire:#2563eb; --c-civil:#f59e0b; --c-aux:#8b5cf6; --c-eq:#10b981; --c-ind:#94a3b8;
+  --warn:#b45309; --warn-bg:#fff7e6; --ref:#7c3aed; --ref-bg:#f4efff;
+  --r:18px; --sh:0 1px 2px rgba(16,24,40,.04),0 10px 30px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 Pretendard,"Pretendard Variable","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── 상단 ── */
+.top{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.86);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1440px;margin:0 auto;padding:12px 28px;display:flex;align-items:center;gap:22px}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:grid;place-items:center;color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+.brand b{display:block;font-size:15.5px;letter-spacing:-.02em}
+.brand span{display:block;font-size:12px;color:var(--muted)}
+.mtabs{display:flex;gap:4px;margin-left:8px}
+.mtab{border:0;background:transparent;padding:8px 14px;border-radius:999px;font-weight:600;color:var(--muted);font-size:14px}
+.mtab.on{background:var(--ink);color:#fff}
+.mtab[disabled]{cursor:default;opacity:.55}
+.mtab small{font-weight:500;font-size:11px;margin-left:4px}
+.top-act{margin-left:auto;display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:11px;padding:8px 13px;font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:6px;color:var(--ink2);transition:.15s}
+.btn:hover{border-color:#cbd5e1;background:#f8fafc}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.pri:hover{background:var(--acc2)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:9px}
+.btn svg{width:15px;height:15px}
+
+.subnav{max-width:1440px;margin:0 auto;padding:18px 28px 0;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.hero h1{margin:0;font-size:26px;letter-spacing:-.03em}
+.hero p{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+.stabs{margin-left:auto;display:inline-flex;background:#e9edf5;border-radius:13px;padding:4px}
+.stab{border:0;background:transparent;padding:7px 15px;border-radius:10px;font-weight:600;font-size:13.5px;color:var(--muted)}
+.stab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.1)}
+
+main{max-width:1440px;margin:0 auto;padding:18px 28px 60px}
+.view{display:none}.view.on{display:block}
+
+/* ── 레이아웃 ── */
+.calc{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:22px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh)}
+.pad{padding:20px 22px}
+.sec-h{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.sec-h h2{margin:0;font-size:16.5px;letter-spacing:-.02em}
+.sec-h .cnt{font-size:12px;color:var(--muted);background:#eef1f6;border-radius:999px;padding:2px 9px;font-weight:600}
+.sec-h .sp{margin-left:auto;display:flex;gap:8px}
+.stack-gap>*+*{margin-top:14px}
+.proj{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.proj input{flex:1;border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:16px;font-weight:700;background:#fff;letter-spacing:-.01em}
+.proj input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+
+/* ── 구간 카드 ── */
+.segc{padding:0;overflow:hidden}
+.segh{display:flex;align-items:center;gap:10px;padding:14px 18px 12px;border-bottom:1px solid var(--line2)}
+.segno{width:28px;height:28px;border-radius:9px;background:var(--acc-soft);color:var(--acc);font-weight:800;display:grid;place-items:center;font-size:13.5px;flex:none}
+.segname{border:0;background:transparent;font-weight:700;font-size:15.5px;min-width:0;flex:1;padding:4px 6px;border-radius:8px;letter-spacing:-.01em}
+.segname:hover{background:#f6f8fb}.segname:focus{outline:none;background:#f1f5fb}
+.tag{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.tag.v{background:#eef3ff;color:var(--acc)}
+.tag.ref{background:var(--ref-bg);color:var(--ref)}
+.tag.w{background:var(--warn-bg);color:var(--warn)}
+.segb{padding:14px 18px 6px}
+.row{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.row>.lbl{width:44px;flex:none;font-size:12.5px;color:var(--muted);font-weight:600}
+.pills{display:inline-flex;flex-wrap:wrap;background:#f1f4f9;border-radius:12px;padding:3px;gap:2px;max-width:100%}
+.pills button{border:0;background:transparent;border-radius:9px;padding:6px 12px;font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.pills button:hover:not(.on):not([disabled]){color:var(--ink2)}
+.pills button.on{background:#fff;color:var(--acc);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.pills button[disabled]{opacity:.4;cursor:not-allowed}
+.pills.big button{padding:8px 14px;font-size:14px}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px 14px;padding:4px 0 14px}
+.f label{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.f .ctl{position:relative}
+.f input,.f select{width:100%;height:40px;border:1px solid var(--line);border-radius:11px;background:#fff;padding:0 12px;font-size:14.5px}
+.f input[type=number]{padding-right:44px}
+.f input:focus,.f select:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+.f .u{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:12.5px;color:var(--faint);pointer-events:none}
+.f .h{font-size:11.5px;color:var(--faint);margin-top:4px;line-height:1.4}
+.f.wide{grid-column:span 2}
+.f.full{grid-column:1/-1}
+.f .pills{display:flex;width:max-content;max-width:100%}
+input::placeholder{color:#94a3b8}
+.segf{display:flex;align-items:center;gap:14px;padding:12px 18px;background:#fafbfd;border-top:1px solid var(--line2);flex-wrap:wrap}
+.segf .tot{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.segf .tot small{font-size:13px;font-weight:600;color:var(--muted);margin-left:3px}
+.segf .pk{font-size:13px;color:var(--muted)}
+.segf .warns{display:flex;gap:6px;flex-wrap:wrap}
+.segf .sp{margin-left:auto;display:flex;gap:6px}
+.lines{display:none;border-top:1px solid var(--line2)}
+.lines.on{display:block}
+table.lt{width:100%;border-collapse:collapse;font-size:13px}
+table.lt th{font-size:11.5px;color:var(--muted);font-weight:600;text-align:right;padding:9px 12px;background:#f8fafc;border-bottom:1px solid var(--line2);white-space:nowrap}
+table.lt td{padding:9px 12px;border-bottom:1px solid var(--line2);text-align:right;white-space:nowrap}
+table.lt th:first-child,table.lt td:first-child{text-align:left;white-space:normal}
+table.lt td.src{color:var(--faint);font-size:11.5px;text-align:left;white-space:normal;max-width:220px}
+table.lt tr:last-child td{border-bottom:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:7px;vertical-align:1px}
+.add-seg{width:100%;border:1.5px dashed #c7d2e2;background:transparent;border-radius:var(--r);padding:16px;font-weight:700;color:var(--acc);display:flex;gap:8px;justify-content:center;align-items:center}
+.add-seg:hover{background:#f5f8ff;border-color:var(--acc)}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+.chip:hover{border-color:var(--acc);color:var(--acc)}
+
+/* ── 설비·비율 ── */
+.eqadd{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.eqadd select{flex:1;min-width:240px;height:40px;border:1px solid var(--line);border-radius:11px;padding:0 10px;background:#fff}
+.eqadd input{width:90px;height:40px;border:1px solid var(--line);border-radius:11px;padding:0 10px}
+table.eq{width:100%;border-collapse:collapse;font-size:13.5px}
+table.eq th{font-size:11.5px;color:var(--muted);font-weight:600;text-align:right;padding:8px 10px;border-bottom:1px solid var(--line)}
+table.eq td{padding:8px 10px;border-bottom:1px solid var(--line2);text-align:right}
+table.eq th:first-child,table.eq td:first-child{text-align:left}
+table.eq input{width:74px;height:34px;border:1px solid var(--line);border-radius:9px;padding:0 8px;text-align:right}
+table.eq .s{display:block;color:var(--faint);font-size:11.5px}
+.x{border:0;background:transparent;color:var(--faint);border-radius:8px;width:30px;height:30px;display:inline-grid;place-items:center}
+.x:hover{background:#fee2e2;color:#dc2626}
+.empty{color:var(--faint);font-size:13.5px;text-align:center;padding:18px 0}
+.ratios{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px 14px}
+
+/* ── 연계 구성 ── */
+.plan .sec-h h2{font-size:17px}
+.stepno{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--ink);color:#fff;font-size:12.5px;font-weight:800;margin-right:2px}
+.plan-in{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px 14px}
+.plan-in .f.hero input{font-size:22px;font-weight:800;height:48px;color:var(--acc)}
+.plan-in .grp{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink2);margin-top:4px;padding-top:10px;border-top:1px dashed var(--line)}
+.plan-in .grp i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.flow{display:grid;grid-template-columns:minmax(96px,.75fr) 24px minmax(0,1.2fr) 24px minmax(150px,1.05fr) 24px minmax(0,1.4fr) 24px minmax(96px,.75fr);align-items:stretch;margin:18px 0 8px}
+.node,.lk{border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:center;min-width:0}
+.node .t,.lk .t{font-size:11.5px;color:var(--muted);font-weight:700}
+.node b,.lk b{font-size:18px;letter-spacing:-.02em;line-height:1.25;word-break:keep-all}
+.node .s,.lk .s{font-size:12px;color:var(--ink2);line-height:1.4}
+.node.gen{background:#fffbeb;border-color:#fde68a}
+.node.ss{background:#ecfdf5;border-color:#a7f3d0}
+.node.kp{background:#f1f5f9}
+.lk{background:#fff}
+.lk.l22{border-color:#fcd34d;box-shadow:inset 0 3px 0 #f59e0b}
+.lk.l154{border-color:#93c5fd;box-shadow:inset 0 3px 0 #2563eb}
+.arr{display:grid;place-items:center;color:#94a3b8}
+.arr svg{width:22px;height:22px}
+.okc{color:#059669;font-weight:700}.ngc{color:#dc2626;font-weight:700}
+table.alt{width:100%;border-collapse:collapse;font-size:13px}
+table.alt th{font-size:11.5px;color:var(--muted);font-weight:600;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
+table.alt td{padding:7px 10px;border-bottom:1px solid var(--line2);text-align:right}
+table.alt th:first-child,table.alt td:first-child,table.alt th:nth-child(2),table.alt td:nth-child(2){text-align:left}
+table.alt tr[data-pick]{cursor:pointer}
+table.alt tr[data-pick]:hover td{background:#f8fafc}
+table.alt tr.cur td{background:#eff6ff;font-weight:700}
+table.alt tr.ref td{color:var(--muted)}
+.plan-act{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.plan-act .note{flex:1;min-width:240px;margin:0}
+details.alts{margin-top:10px;border:1px solid var(--line2);border-radius:12px;padding:4px 12px;overflow-x:auto}
+details.alts summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--ink2);padding:8px 0}
+.cap{font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.cap.ok{background:#ecfdf5;color:#059669}.cap.ng{background:#fef2f2;color:#dc2626}.cap.na{background:#f1f4f9;color:var(--muted)}
+.plansum{border-radius:13px;padding:10px 12px;font-size:13px;margin:0 0 14px;line-height:1.5}
+.plansum.ok{background:#ecfdf5;color:#065f46}.plansum.ng{background:#fef2f2;color:#991b1b}.plansum.na{background:#f7f9fc;color:var(--muted)}
+@media (max-width:1100px){
+  .flow{grid-template-columns:1fr;gap:0}
+  .arr{height:26px}.arr svg{transform:rotate(90deg)}
+}
+
+/* ── 요약 ── */
+.sum{position:sticky;top:78px}
+.sum .k{font-size:13px;color:var(--muted);font-weight:600}
+.big{font-size:44px;font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:4px 0 2px}
+.big small{font-size:17px;font-weight:700;color:var(--muted);margin-left:4px;letter-spacing:0}
+.sum .sub{font-size:13px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.kpi{background:#f7f9fc;border-radius:13px;padding:10px 12px}
+.kpi span{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.kpi b{font-size:17px;letter-spacing:-.02em}
+.kpi b small{font-size:11.5px;color:var(--muted);font-weight:600;margin-left:2px}
+.bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:#eef1f6;margin:6px 0 12px}
+.bar i{display:block;height:100%}
+.leg{list-style:none;margin:0;padding:0}
+.leg li{display:flex;align-items:center;font-size:13.5px;padding:5px 0}
+.leg li .n{flex:1;color:var(--ink2)}
+.leg li b{font-weight:700}
+.leg li em{font-style:normal;color:var(--faint);font-size:12px;width:46px;text-align:right}
+.divider{height:1px;background:var(--line2);margin:14px 0}
+.sgl{list-style:none;margin:0;padding:0}
+.sgl li{display:flex;gap:8px;align-items:baseline;font-size:13px;padding:4px 0}
+.sgl li .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
+.sgl li span.m{color:var(--faint);font-size:11.5px}
+.note{font-size:12px;color:var(--muted);background:#f7f9fc;border-radius:12px;padding:10px 12px;line-height:1.5}
+.note b{color:var(--ink2)}
+.sumact{display:flex;gap:8px;margin-top:14px}
+.sumact .btn{flex:1;justify-content:center}
+.wlist{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.wlist div{font-size:12px;border-radius:10px;padding:7px 10px;line-height:1.45}
+.wlist .w{background:var(--warn-bg);color:var(--warn)}
+.wlist .r{background:var(--ref-bg);color:var(--ref)}
+
+/* ── 비교 ── */
+.cmp-ctl{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.cmp-ctl .f{min-width:130px}
+.cmp-list{margin-top:18px}
+.cmp{display:grid;grid-template-columns:220px minmax(0,1fr) 150px 120px;gap:16px;align-items:center;padding:14px 4px;border-top:1px solid var(--line2)}
+.cmp:first-child{border-top:0}
+.cmp .t b{display:block;font-size:14.5px}
+.cmp .t span{font-size:12px;color:var(--muted)}
+.cmp .track{height:30px;background:#f1f4f9;border-radius:9px;overflow:hidden;position:relative}
+.cmp .fill{height:100%;border-radius:9px;background:linear-gradient(90deg,#60a5fa,#2563eb)}
+.cmp.min .fill{background:linear-gradient(90deg,#34d399,#059669)}
+.cmp.ref .fill{background:repeating-linear-gradient(135deg,#c4b5fd 0 8px,#a78bfa 8px 16px)}
+.cmp .fill-lbl{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.cmp .v{text-align:right}
+.cmp .v b{font-size:18px;letter-spacing:-.02em}
+.cmp .v span{display:block;font-size:12px;color:var(--muted)}
+.cmp .a{text-align:right}
+
+/* ── 단가표 ── */
+.pt-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.search{flex:1;min-width:240px;position:relative}
+.search input{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;padding:0 14px 0 38px;background:#fff}
+.search input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--faint)}
+.pgrp{margin-bottom:16px;overflow:hidden}
+.pgrp h3{margin:0;padding:14px 20px;font-size:15px;border-bottom:1px solid var(--line2);display:flex;gap:8px;align-items:center}
+.pgrp h3 span{font-size:12px;color:var(--muted);font-weight:500}
+table.pt{width:100%;border-collapse:collapse;font-size:13.5px}
+table.pt th{font-size:11.5px;color:var(--muted);font-weight:600;padding:8px 14px;text-align:right;background:#fafbfd;border-bottom:1px solid var(--line2)}
+table.pt td{padding:8px 14px;border-bottom:1px solid var(--line2);text-align:right}
+table.pt th:first-child,table.pt td:first-child{text-align:left}
+table.pt td.src,table.pt th.src{text-align:left;color:var(--muted);font-size:12px}
+table.pt input{width:120px;height:34px;border:1px solid var(--line);border-radius:9px;padding:0 9px;text-align:right;background:#fff}
+table.pt input:focus{outline:none;border-color:var(--acc)}
+table.pt tr.chg td{background:#fffbeb}
+table.pt tr.chg input{border-color:#f59e0b}
+table.pt tr:last-child td{border-bottom:0}
+.refonly{font-size:11px;color:var(--ref);background:var(--ref-bg);border-radius:999px;padding:2px 7px;font-weight:700;margin-left:6px}
+
+/* ── 기준 ── */
+.notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:16px}
+#eqTable{overflow-x:auto}
+.notes h3{margin:0 0 8px;font-size:15.5px}
+.notes ul{margin:0;padding-left:18px;color:var(--ink2);font-size:13.5px}
+.notes li{margin:4px 0}
+.notes code{background:#f1f4f9;border-radius:6px;padding:1px 6px;font-size:12.5px}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+.toast.on{opacity:1;transform:translateX(-50%)}
+footer{max-width:1440px;margin:0 auto;padding:0 28px 40px;color:var(--faint);font-size:12px}
+#report{display:none}
+
+@media (max-width:1100px){
+  .calc{grid-template-columns:minmax(0,1fr)}
+  .sum{position:static;order:-1}
+  .cmp{grid-template-columns:1fr 130px}
+  .cmp .track{grid-column:1/-1;grid-row:2}
+  .cmp .a{grid-column:1/-1;text-align:left}
+}
+@media (max-width:720px){
+  .top-in{padding:10px 16px;gap:10px;flex-wrap:wrap}
+  .mtabs{order:3;width:100%;margin:0;overflow-x:auto}
+  .subnav,main,footer{padding-left:16px;padding-right:16px}
+  .stabs{margin-left:0;width:100%;overflow-x:auto}
+  .brand span{display:none}
+  .top-act .btn span{display:none}
+  .f.wide{grid-column:auto}
+  .big{font-size:36px}
+  .row>.lbl{width:100%}
+  .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .f.wide,.f:has(.pills){grid-column:1/-1}
+  .segh{padding:12px 12px 10px;gap:6px}.segb{padding:12px 14px 4px}.segf{padding:12px 14px}
+  .segh .tag{display:none}
+  .pad{padding:16px}
+  .eqadd select{min-width:0;width:100%}
+  table.eq .s{display:none}
+  table.eq th,table.eq td{padding:8px 4px}
+  table.eq input{width:56px}
+  .lines{overflow-x:auto}
+  .cmp-ctl .f{min-width:0;flex:1 1 140px}
+  #ptList .pgrp{overflow-x:auto}
+}
+@media print{
+  body{background:#fff}
+  .top,.subnav,main,footer,.toast{display:none!important}
+  #report{display:block;padding:0 6mm;font-size:11.5px}
+  #report h1{font-size:19px;margin:0 0 4px}
+  #report table{width:100%;border-collapse:collapse;margin:8px 0 14px}
+  #report th,#report td{border:1px solid #cbd5e1;padding:4px 6px;text-align:right}
+  #report th:first-child,#report td:first-child,#report td.l{text-align:left}
+  #report th{background:#f1f5f9}
+  #report .m{color:#555}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+      <div><b>신재생 공사비 산출기</b><span>한전 2026 기준단가 · 전기 · 토목·건축 · v1.3</span></div>
+    </div>
+    <nav class="mtabs" aria-label="공사 분야">
+      <button class="mtab on" data-mt="elec">전기공사</button>
+      <button class="mtab" data-mt="civ">토목·건축</button>
+      <button class="mtab" disabled title="다음 작업에서 추가">풍력설비<small>준비 중</small></button>
+    </nav>
+    <div class="top-act">
+      <button class="btn" id="btnCsv" title="산출 내역을 엑셀용 CSV로 저장"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg><span>CSV</span></button>
+      <button class="btn" id="btnPrint" title="산출 내역서 인쇄 / PDF 저장"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/></svg><span>인쇄</span></button>
+      <button class="btn ghost" id="btnReset" title="예시 상태로 초기화"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7M3 3v6h6"/></svg><span>초기화</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="subnav">
+  <div class="hero">
+    <h1>전기공사비 산출</h1>
+    <p>22.9kV · 154kV · 345kV &nbsp;|&nbsp; 가공 · 지중(관로·전력구·터널) · 해저 · 변전·접속설비 &nbsp;|&nbsp; 금액 단위 백만원 (요약은 억원)</p>
+  </div>
+  <div class="stabs" role="tablist">
+    <button class="stab on" data-view="calc">산출</button>
+    <button class="stab" data-view="cmp">방식 비교</button>
+    <button class="stab" data-view="prices">단가표</button>
+    <button class="stab" data-view="notes">기준·주의</button>
+  </div>
+</div>
+
+<main>
+  <!-- 산출 -->
+  <section class="view on" id="v-calc">
+    <div class="calc">
+      <div class="stack-gap">
+        <div class="proj"><input id="projName" aria-label="사업명" placeholder="사업명 (예: 00해상풍력 연계선로)"></div>
+
+        <div class="card pad plan" id="planCard">
+          <div class="sec-h"><h2><span class="stepno">1</span> 연계 구성 — 발전용량으로 회선 · 변압기 정하기</h2></div>
+          <div class="plan-in" id="planIn"></div>
+          <div id="planOut"></div>
+        </div>
+
+        <div class="sec-h" style="margin:22px 0 0"><h2><span class="stepno">2</span> 공사비 산출</h2></div>
+
+        <div>
+          <div class="sec-h"><h2>경과지 구간</h2><span class="cnt" id="segCnt">0</span>
+            <div class="sp"><button class="btn sm" id="btnFoldAll">내역 모두 접기</button></div></div>
+          <div id="segs" class="stack-gap"></div>
+          <div style="margin-top:14px">
+            <button class="add-seg" id="btnAddSeg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>구간 추가</button>
+            <div class="quick" id="quickAdd"></div>
+          </div>
+        </div>
+
+        <div class="card pad">
+          <div class="sec-h"><h2>변전 · 접속설비</h2><span class="cnt" id="eqCnt">0</span></div>
+          <div class="eqadd">
+            <select id="eqPick" aria-label="설비 선택"></select>
+            <input id="eqQty" type="number" min="0" step="1" value="1" aria-label="수량">
+            <button class="btn pri" id="btnEqAdd">추가</button>
+          </div>
+          <div class="quick" id="eqQuick" style="margin:-2px 0 12px">
+            <span style="font-size:12.5px;color:var(--muted);align-self:center">빠른 추가</span>
+            <button class="chip" data-eqq="ss154_1">+ 발전사업자 변전소 1Bank</button>
+            <button class="chip" data-eqq="ss154_2">+ 2Bank</button>
+            <button class="chip" data-eqq="gis154">+ 154kV GIS Bay</button>
+            <button class="chip" data-eqq="pcm154">+ 154kV 보호반</button>
+          </div>
+          <div id="eqTable"></div>
+        </div>
+
+        <div class="card pad">
+          <div class="sec-h"><h2>간접비 · 예비비 · 물가 보정</h2></div>
+          <div class="ratios" id="ratios"></div>
+          <p class="note" style="margin:14px 0 0"><b>설계·감리 자동</b>은 한전 조건별 관로·전력구·터널 구간에만 붙습니다(고문 패키지·변전소 패키지는 이미 포함, 가공·22.9kV·해저·주기기는 제외). 한전 기준단가에는 <b>이윤·일반관리비가 빠져</b> 있으니 필요하면 비율을 넣으세요. 물가 보정은 <b>(1 + 연 상승률)<sup>(적용연도 − 2026)</sup></b> 을 곱합니다.</p>
+        </div>
+      </div>
+
+      <aside class="card pad sum" id="summary">
+        <div class="k">총 공사비</div>
+        <div class="big num"><span id="sTotal">0</span><small>억원</small></div>
+        <div class="sub" id="sSub"></div>
+        <div class="plansum na" id="sPlan" style="margin-top:14px"></div>
+        <div class="kpis">
+          <div class="kpi"><span>경과지 합계</span><b id="sKm">0<small>km</small></b></div>
+          <div class="kpi"><span>선로 km당 (변전 제외)</span><b id="sPerKm">0<small>억원</small></b></div>
+        </div>
+        <div class="bar" id="sBar"></div>
+        <ul class="leg" id="sLeg"></ul>
+        <div class="divider"></div>
+        <div class="k" style="margin-bottom:4px">구간별</div>
+        <ul class="sgl" id="sSegs"></ul>
+        <div class="wlist" id="sWarn"></div>
+        <div class="sumact">
+          <button class="btn" id="btnCsv2">CSV 저장</button>
+          <button class="btn pri" id="btnPrint2">내역서 인쇄</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 토목·건축 -->
+  <section class="view" id="v-civ">
+    <div class="calc">
+      <div class="stack-gap">
+        <div class="card pad">
+          <div class="sec-h"><h2>변전소 · 개폐소 건축</h2><span class="cnt" id="civCnt">0</span></div>
+          <div class="eqadd">
+            <select id="civPick" aria-label="건축 항목 선택"></select>
+            <input id="civQty" type="number" min="0" step="1" value="1" aria-label="수량">
+            <button class="btn pri" id="btnCivAdd">추가</button>
+          </div>
+          <div class="quick" style="margin:-2px 0 12px" id="civQuick">
+            <span style="font-size:12.5px;color:var(--muted);align-self:center">빠른 추가</span>
+            <button class="chip" data-cq="bld_ss">+ 발전사업자 변전소 건축 30억</button>
+            <button class="chip" data-cq="bld_sw_in">+ 옥내형 표준개폐소 67.5억</button>
+            <button class="chip" data-cq="bld_sw_out">+ 옥외형 개폐소 30억</button>
+          </div>
+          <div id="civTable"></div>
+          <p class="note" style="margin:12px 0 0"><b>전기공사 탭과 나눠 계산합니다.</b> 전기공사 탭의 "154kV 발전사업자 변전소 / 표준개폐소"는 <b>변전설비만</b>(1Bank 85.5억 · 2Bank 119.7억 · 3Bank 166.8억 · 개폐소 88.5억), 이 탭은 <b>건축(변전동·관리동, 부대토목·설계·감리 포함)</b>입니다. 연계 구성의 [구간 만들기]를 누르면 변전소 건축 1개소가 자동으로 들어옵니다. 2~3Bank처럼 건물이 커지면 수량이나 단가표에서 조정하세요.</p>
+        </div>
+
+        <div class="card pad">
+          <div class="sec-h"><h2>부지 여건 추가 토목 · 울타리</h2><span class="cnt">선택 · 한전 2026</span></div>
+          <p class="note" style="margin:0 0 12px">성토·절토가 크거나 옹벽·파일이 필요한 부지만 수량을 넣으세요(기본 0). 설계·감리 자동이 켜져 있으면 설계 3.5% + 감리 5%가 붙습니다(전기공사 탭 간접비 카드에서 켜고 끔).</p>
+          <div id="civxTable"></div>
+        </div>
+      </div>
+
+      <aside class="card pad sum" id="civSum">
+        <div class="k">총 공사비 (전기 + 토목·건축)</div>
+        <div class="big num"><span id="cTotal">0</span><small>억원</small></div>
+        <div class="sub" id="cSub"></div>
+        <div class="kpis">
+          <div class="kpi"><span>전기공사</span><b id="cElec">0<small>억원</small></b></div>
+          <div class="kpi"><span>토목 · 건축</span><b id="cCiv">0<small>억원</small></b></div>
+        </div>
+        <div class="divider"></div>
+        <div class="k" style="margin-bottom:4px">토목·건축 내역</div>
+        <ul class="sgl" id="cLines"></ul>
+        <div class="sumact">
+          <button class="btn" id="btnCsv3">CSV 저장</button>
+          <button class="btn pri" id="btnPrint3">내역서 인쇄</button>
+        </div>
+        <p class="note" style="margin:12px 0 0">간접비·예비비·물가 보정 비율은 전기공사 탭 설정을 전체 합계에 함께 적용합니다.</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 방식 비교 -->
+  <section class="view" id="v-cmp">
+    <div class="card pad">
+      <div class="sec-h"><h2>같은 조건에서 방식별 비교</h2></div>
+      <div class="cmp-ctl" id="cmpCtl"></div>
+      <div class="cmp-list" id="cmpList"></div>
+      <p class="note" style="margin-top:14px">각 방식은 기본 조건(관로·전력구 = 일반도로·가시설, 터널 = 실드TBM·수직구 2개소×30m·오탁수 1조, 가공 = 풍압지역 3, 부대설비 제외)으로 계산합니다. 세부 조건은 <b>구간으로 추가</b> 후 산출 탭에서 바꾸세요. 해저·개략 패키지는 <b>참고 단가</b>(빗금)입니다.</p>
+    </div>
+  </section>
+
+  <!-- 단가표 -->
+  <section class="view" id="v-prices">
+    <div class="pt-top">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="ptQ" placeholder="단가 검색 (예: 2500, 전력구, GIS, 해저)"></div>
+      <span class="cnt" id="ptChg" style="font-size:12.5px;color:var(--muted)"></span>
+      <button class="btn" id="btnPtReset">수정한 단가 모두 복원</button>
+    </div>
+    <p class="note" style="margin:0 0 14px">‘적용 단가’를 고치면 이 브라우저에 저장되어 산출·비교에 바로 반영됩니다(노란 줄). 원본 단가는 그대로 남습니다. 단위는 모두 <b>백만원</b>(원본이 천원이면 ÷1,000).</p>
+    <div id="ptList"></div>
+  </section>
+
+  <!-- 기준·주의 -->
+  <section class="view" id="v-notes">
+    <div class="notes">
+      <div class="card pad"><h3>자료 출처 (최신순)</h3><ul>
+        <li><b>2026년도 건설분야 예산 기준단가</b> (한전, 2026.3) — 가공송전·지중케이블·관로·전력구·터널·부대설비·변전·배전 단가의 기준</li>
+        <li><b>23kV 개략공사비 산출서(km당)</b> (2026.8) — 22.9kV 용량별(20~60MW) 가공·지중. <i>이윤·일반관리비·경비 불포함</i></li>
+        <li><b>154전력설비 개략공사비 산출표</b> (작성 2026.6.22) — 154kV 개폐소·변전소(설계·감리 포함), 지중 1회선 패키지</li>
+        <li><b>표준외 154 지중송전선로 용량현황</b> — 154kV 선종별 허용전류</li>
+        <li><b>개폐소 및 변전소 소요면적</b> — 부지 참고</li>
+        <li><b>해저 공사비 산출</b> (2026.6 정리, 단가 기준 2019~2023) — 154kV 외부망 / 345kV 신안 해상풍력 접속설비 검토(한전) 보정</li>
+        <li>원본 위치: <code>E:\KCH(2025.04)\08. 계 통\'260821 _ [공사비] _ 공사비 산출내역</code>, <code>'260605 _ [계통] 해저 공사비 산출</code></li>
+      </ul></div>
+      <div class="card pad"><h3>지중 케이블 (C-km)</h3><ul>
+        <li>단가는 <b>회선-km(C-km)</b>. 금액 = 회선수 × 긍장 × 단가</li>
+        <li><b>1km 미만 단가</b>는 1km 미만이면서 <b>종단접속설비를 포함</b>하는 공사에만 적용. 1km 미만이라도 종단접속이 없으면 1km 이상 단가 (구간의 ‘긍장 구분’에서 선택, 자동 = 1km 미만이면 미만 단가)</li>
+        <li>포함: 케이블·접속함(접속재·받침)·기타(절연통보호장치·피뢰기·금구류)·경비(사용전검사·운반)·도급(포설·접속)·감리</li>
+        <li>제외: 가설·방재·부대공사, <b>Y분기 접속함·Al도체 케이블 등 특수자재</b></li>
+        <li>2026 개정: 터널전력구 소방공사 단가 1km 이상/미만 세분화</li>
+      </ul></div>
+      <div class="card pad"><h3>관로 · 전력구 · 터널 (토목)</h3><ul>
+        <li><b>관로</b>: 송전 4회선(φ200 파형관 13공 + φ175 1공) 기준. <b>2회선·6회선은 ±15%</b> (이 산출기: 1~2회선 −15%, 3~4회선 기준, 5~6회선 +15%)</li>
+        <li>관로 암비율 할증: 20% 이내 0 / 20~50% <b>9%</b> / 50% 이상 <b>24%</b>. 관로 표에는 154kV만 있어 345kV는 준용(참고)</li>
+        <li>일반도로 = 포장복구 있음, 병행구간 = 포장복구 없음, 가시설 = H-Pile·토류판</li>
+        <li><b>전력구</b> 기준단면: 양측 2.1×2.1m, 편측 1.7×2.1m. 단면 추가 시 <b>기준공사비 × 추가단면수 × 1.4</b> 가산</li>
+        <li>한전 기준공사비 1km = 전력구 × 1km + <b>환기구 × 2개소</b>, 관로 1km = 관로 × 1km + <b>맨홀 × 2개소</b> → 이 산출기의 자동 개수(1km당 2개소)</li>
+        <li><b>터널</b> 기준직경: 실드TBM φ3.0 / 세미실드·NATM φ2.6 / 강관압입 φ2.4 / 메사실드 2.1×2.1m. 초과 시 기계식(실드TBM·세미실드) <b>직경 1m당 30.7%</b>, 인력식은 단면비율</li>
+        <li>오탁수 처리시설: 발진(1,000ton)·도달(200ton) 1조. 연약·특수지반 보강비는 모두 <b>별도</b></li>
+        <li>부대설비(선택): 전기 566.271백만원/km + 소방(터널 283.4~303.3 / 개착 213.8~355.4백만원/km), 설계용역비 (자재+도급)×5% 별도</li>
+      </ul></div>
+      <div class="card pad"><h3>가공송전 · 배전</h3><ul>
+        <li>가공송전 단가 = 자재(철탑·전선·애자·기타·토목분) + 경비 + 도급(시공·측량·감리) 합계, 천원/km → 백만원/km</li>
+        <li>표준경간 154kV 400m / 345kV 450m. 기준공사비(2-1)는 <b>풍압지역 3</b> 값과 같음</li>
+        <li>22.9kV 용량별 산출서: 20MW 1회선 · 40MW 2회선 · 50MW 3회선 · 60MW 3~4회선. 지중은 케이블 + ELP 관로 + MS-4 맨홀 2기/km</li>
+        <li>한전 표준(2-1): 가공 고압 3상 190백만원/km(변대·개폐기·감리 포함), 지중 683백만원/km(관로 259·케이블 169·기기 162·감리 93, 도통시험 제외)</li>
+      </ul></div>
+      <div class="card pad"><h3>변전 · 접속설비</h3><ul>
+        <li>변압기·GIS = 자재 + 설치 + 운반. <b>보호반·Sh.C는 자재만</b>(설치비 별도)</li>
+        <li>감시제어·충전장치·인출철구·소내배전반·모선배선·접지·기기기초, 슈퍼바이저 파견·감리 등 사급경비, 간접노무비·일반관리비·이윤은 <b>별도</b></li>
+        <li>154kV 개폐소·변전소 금액은 <b>변전설비 + 건축(부대토목) + 설계 + 감리</b> 포함 패키지</li>
+        <li>345kV 토건(㎡)은 건물 연면적 기준, 토목·조경·용지비·울타리 별도</li>
+        <li>소요면적: 154kV 옥내 표준개폐소 건물 840㎡(40×21m) / 도로포함 부지 2,506㎡ · 변전소 200MVA 1층 건물 1,200㎡ / 부지 2,484㎡</li>
+      </ul></div>
+      <div class="card pad"><h3>해저 (참고 단가)</h3><ul>
+        <li>154kV XLPE 500㎟×3심: 1회선 32.7 / 2회선 53.64 / 3회선 86.34 억원/km (자재+설치, 75km 미만 외부망)</li>
+        <li>345kV XLPE 1,000㎟×3C×2회선: 111.9 억원/km (자재 35.25 + 설치 20.7 억원 ×2회선, 신안 해상풍력 접속설비 검토자료(한전) 보정, 323MW)</li>
+        <li>HVDC 500kV XLPE 2,500㎟ 2C: 41.7 억원/km (75km 이상, 참고표만)</li>
+        <li><b>2019~2023년 단가</b>라 최신 물가가 반영되지 않았습니다. 구간의 ‘보정계수’로 조정하세요. 양륙부·접속함·보호공(매설·피복석)·조사비는 불포함</li>
+      </ul></div>
+      <div class="card pad" style="grid-column:1/-1"><h3>공사비 확정 기준 (v1.2 전기 · v1.3 토목·건축, 2026-09-17 승인)</h3><ul>
+        <li><b>기본</b>: 한전 2026 건설분야 예산 기준단가. 단, <b>154kV 지중 연계선로(관로)와 154kV 발전사업자 변전소는 고문 제공 「154전력설비 개략공사비 산출표」(2026.6)</b>를 확정 단가로 사용 → 154kV 방식 기본값 "관로 · 고문 패키지"</li>
+        <li><b>고문 패키지</b> = (케이블 공사비 + 지중토목) × 회선수 × 긍장 + 설계 3.5% + 감리 5%. 케이블: 400·600·800㎟ 대한전선 견적 / 1,200·2,000·2,500㎟ 한전 2026 단가 − 감리. 토목: 기준값 964.384백만원/km·회선(출처 미표기) × 선종 할증 1.0~1.3</li>
+        <li>대표값(설계·감리 포함, 억원/km): 1,200㎟ 1회선 27.5 · 2회선 55.0 · 4회선 110.0 / 2,000㎟ 33.9 · 67.9 / 2,500㎟ 39.3 · 78.6 / 400㎟ 21.2 · 600㎟ 23.3 · 800㎟ 26.4 (1회선)</li>
+        <li><b>변전소 (v1.3 분리)</b>: <b>전기공사 탭 = 변전설비</b> 1Bank 85.5억 · 2Bank 119.7억 · 3Bank 166.8억 · 표준개폐소 88.5억 (한전 적서리 시행단가 + 설계·감리) / <b>토목·건축 탭 = 건축</b> 발전사업자 변전소 <b>30억 고정</b>(사용자 확정, 사내 태양광 변전소 실적 당시 28~31억·고문 1Bank 건축 31.6억과 같은 수준) · 옥내형 표준개폐소 67.5억 · 옥외형 개폐소 30억 준용</li>
+        <li><b>토목·건축 추가 항목</b>(선택, 기본 0): 한전 2026 변전소 토목(토공·비탈면·포장·배수·옹벽·조경·파일) · 울타리(경계·보안)·망루 → 설계·감리 자동이면 설계 3.5% + 감리 5%. 한전 토건 ㎡ 항목은 건축 설계 5% + 감리 1.2%</li>
+        <li><b>설계·감리 자동</b>: 한전 조건별 관로·전력구·터널 → 케이블 설계 3.5%(감리는 한전 단가에 포함), 토목 설계 3.5% + 감리 5%. 가공(용역비에 측량·감리 포함)·22.9kV 산출서·해저·주기기에는 붙이지 않음</li>
+        <li><b>사내 실적 검증 (비율만 공개)</b>: 154kV 지중 1,200㎟ 2회선 관로 실적 1건을 한전 품목별 상승률로 2026년 환산해 비교(설계·감리 제외) — 고문 방식 <b>98%</b>, 한전 일반도로·구배 91%, 한전 일반도로·가시설 126%. 케이블만은 한전 2026 단가와 100%. 154kV 승압변전소 실적 환산 범위 안에 고문 1Bank가 위치. <i>원금액·사업명은 대외비라 확정안 문서에만 기록</i></li>
+        <li><b>한전 기준공사비 2021.12 → 2026.3 상승률</b>: 154kV 지중 케이블 ×1.71(연 11.3%) · 345kV 케이블 ×1.32 · 154kV 관로 ×1.29 · 전력구 ×1.27 · 154kV 가공 ×1.24~1.26 · 345kV 가공 ×1.23~1.24 · 154kV 변압기 ×2.13(연 16.3%) · 345kV 변압기 ×1.49 · 154kV GIS ×1.13 · 345kV GIS ×0.98 → 과거 실적 보정에 사용, 2027년 이후 착공 보정은 연 3% 기본</li>
+        <li>근거 문서: <code>20260916_분석_전기공사비확정안_v1.1.md</code> (대외비 포함)</li>
+      </ul></div>
+      <div class="card pad"><h3>연계 구성 · 용량 기준 (v1.1)</h3><ul>
+        <li><b>22.9kV 회선수</b> = 발전용량 ÷ 회선당 최대 용량(기본 <b>20MW</b>) 올림. 예) 70MW → 4회선. 참고: 한전 배전 기술기준 상시운전용량은 일반 10MVA·대용량 15MVA, 23kV 산출서는 1회선 20MW 가정</li>
+        <li><b>변압기 대수</b> = 발전용량 ÷ 1대 용량(기본 <b>100MW</b>, 사내 태양광 실적 사례) 올림. 공사비는 154kV 변전소 Bank 패키지 단가(1~3Bank), 4대 이상은 3Bank + 변압기 추가</li>
+        <li><b>154kV 송전 가능 용량</b> = 회선수 × 회선당 MVA × 이용률(기본 <b>80%</b>) × 역률 0.95. 한전은 회선당 75%로 운영하나 발전사업자 전용선로 기준으로 80% 적용. 용량을 만족하면 <b>1회선도 허용</b></li>
+        <li>회선당 MVA: 관로 XLPE 1,200㎟ 1/2/3/4회선 308/257/215/192, 2,000㎟ 383/318/264/235, 2,500㎟ 410/340/281/250 · 전력구 1,200/2,000/2,500㎟ 354/430/459(3회선 이상 348/420/446) · 가공 ACSR 330 195, 410 226, 330×2B 390, 410×2B 452 · 해저 XLPE 500㎟ 1도체 125</li>
+        <li>터널은 전력구 허용전류를 준용, 345kV 관로는 자료가 없어 전력구 값 준용</li>
+        <li>구간 카드의 "송전 가능 MW"가 발전용량보다 작으면 빨간 표시. 요약판에 가장 작은 구간(병목) 표시</li>
+        <li>출처: <code>'231206 송전선로_선종별_용량현황.xlsx</code>, <code>표준외154지중송전선로용량현황.pdf</code>, <code>'230112 신안군 인근 계통현황 요약.pdf</code>, <code>분산형전원_배전계통_연계_기술기준.pdf</code>, 상세는 <code>20260917_분석_송배전선로회선별송전용량_v1.0.md</code></li>
+      </ul></div>
+      <div class="card pad"><h3>쓰는 법</h3><ul>
+        <li>구간마다 <b>전압 → 방식 → 긍장·회선·선종</b>을 고르면 오른쪽 총액이 즉시 바뀝니다</li>
+        <li>‘자동’ 칸(맨홀·환기구 개수 등)은 비워 두면 기준 개수로 계산하고, 숫자를 넣으면 그 값을 씁니다</li>
+        <li><b>내역</b> 버튼 → 항목·수량·단가·출처 확인. 모든 입력은 이 브라우저에 자동 저장</li>
+        <li>단가를 최신 견적으로 바꾸려면 <b>단가표</b> 탭에서 적용 단가만 고치세요</li>
+        <li>이 결과는 <b>개략(예산) 수준</b>입니다. 실제 사업은 회선수·포설간격·토양 열저항·접속함 수량·장거리 충전전류·N-1·부지 여건에 따른 상세설계가 필요합니다</li>
+      </ul></div>
+    </div>
+  </section>
+</main>
+
+<footer>© 2026 황정연 · 신재생에너지 사업개발 · 단가 기준: 한전 2026 건설분야 예산 기준단가(2026.3) 외 · 개략 산출용 참고자료</footer>
+<div id="report"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+/* ───────────────────────── 단가 데이터 (백만원) ───────────────────────── */
+var K26 = '2026 건설분야 예산 기준단가';
+var P = {}, GROUPS = [];
+function grp(id, name, desc){ GROUPS.push({id:id, name:name, desc:desc}); }
+function add(id, g, name, unit, v, src, x){ var o = {id:id, g:g, name:name, unit:unit, v:v, src:src}; if (x) for (var k in x) o[k] = x[k]; P[id] = o; }
+
+grp('oh', '가공송전 (154·345kV)', '천원/km → 백만원/km · 자재+경비+도급 합계');
+// [풍압지역, 전압, 회선, 선종, 자재소계, 도급분, 기준단가(km), 기준단가(기)]  (천원)
+[
+ [3,154,2,'410x2B',329856,1181340,1724312,689725],[3,154,2,'330x2B',298107,1112806,1615378,646151],
+ [3,154,2,'410',219412,958628,1357068,542827],[3,154,2,'330',201819,912705,1271449,508580],
+ [3,154,4,'410x2B',741496,2691811,3676965,1470786],[3,154,4,'330x2B',661409,2248917,3142498,1256999],
+ [3,154,4,'410',505946,1722828,2446667,978667],[3,154,4,'330',431471,1366650,1985961,794384],
+ [3,345,2,'480x4B',836416,2476055,3612896,1625803],[3,345,2,'480x2B',551897,1798192,2590718,1165823],
+ [3,345,4,'480x4B',1461144,4532039,6391909,2876359],[3,345,4,'480x2B',1009073,3236161,4563267,2053470],
+ [2,154,2,'410x2B',331939,1187533,1733244,693298],[2,154,2,'330x2B',306783,1133837,1653458,661383],
+ [2,154,2,'410',228895,964950,1376255,550502],[2,154,2,'330',212810,936847,1318481,527392],
+ [2,154,4,'410x2B',757477,2702422,3710016,1484006],[2,154,4,'330x2B',669491,2263029,3172055,1268822],
+ [2,154,4,'410',519969,1731369,2474139,989656],[2,154,4,'330',435388,1399425,2024523,809809],
+ [2,345,2,'480x4B',853572,2626996,3786590,1703966],[2,345,2,'480x2B',564029,1850075,2659356,1196710],
+ [2,345,4,'480x4B',1488377,4660699,6553039,2948868],[2,345,4,'480x2B',1026478,3357674,4707320,2118294]
+].forEach(function(r){
+  add('oh_'+r[1]+'_'+r[0]+'_'+r[2]+'_'+r[3], 'oh', r[1]+'kV 가공 '+r[2]+'회선 ACSR '+condLbl(r[3])+' · 풍압지역 '+r[0], '백만원/km',
+      r[6]/1000, K26+' p.5~7', {tower:r[7]/1000, mat:r[4]/1000, sub:r[5]/1000});
+});
+
+grp('cable', '지중 케이블공사 (154·345kV)', '천원/C-km → 백만원/C-km · 케이블·접속함·경비·도급·감리 포함');
+[[154,'2500',2486792,3426617],[154,'2000',2069008,2938795],[154,'1200',1546734,2071315],
+ [345,'2500',3078219,4384743],[345,'2000',2919909,4126149],[345,'1200',2679985,3768034]].forEach(function(r){
+  add('cb_'+r[0]+'_'+r[1]+'_ge', 'cable', r[0]+'kV XLPE '+comma(r[1])+'㎟ · 1km 이상', '백만원/C-km', r[2]/1000, K26+' p.12');
+  add('cb_'+r[0]+'_'+r[1]+'_lt', 'cable', r[0]+'kV XLPE '+comma(r[1])+'㎟ · 1km 미만(종단접속 포함)', '백만원/C-km', r[3]/1000, K26+' p.12');
+});
+
+grp('duct', '관로 공사 (154kV)', '천원 → 백만원 · 송전 4회선 기준, 토공·관로포설·도통시험·도로복구·부대 포함');
+add('duct_gen_slope','duct','관로 본선 · 일반도로 · 구배','백만원/m',1.531,K26+' p.13');
+add('duct_gen_shore','duct','관로 본선 · 일반도로 · 가시설','백만원/m',3.608,K26+' p.13');
+add('duct_par_slope','duct','관로 본선 · 병행구간 · 구배','백만원/m',1.415,K26+' p.13');
+add('duct_par_shore','duct','관로 본선 · 병행구간 · 가시설','백만원/m',3.305,K26+' p.13');
+add('mh_gen_shore','duct','맨홀 · 일반도로 · 가시설','백만원/개소',198.399,K26+' p.13');
+add('mh_par_slope','duct','맨홀 · 병행구간 · 구배','백만원/개소',167.669,K26+' p.13');
+add('mh_par_shore','duct','맨홀 · 병행구간 · 가시설','백만원/개소',184.761,K26+' p.13');
+add('mh_water','duct','맨홀 차수','백만원/개소',61.711,K26+' p.13');
+
+grp('box', '전력구 공사 (154·345kV)', '천원 → 백만원 · 토공·구조물·도로복구·부대 포함');
+add('box_both_gen_shore','box','전력구 양측(2.1×2.1m) · 일반도로 · 가시설','백만원/m',9.783,K26+' p.15');
+add('box_both_par_slope','box','전력구 양측(2.1×2.1m) · 병행구간 · 구배','백만원/m',5.517,K26+' p.15');
+add('box_both_par_shore','box','전력구 양측(2.1×2.1m) · 병행구간 · 가시설','백만원/m',9.213,K26+' p.15');
+add('box_one_gen_shore','box','전력구 편측(1.7×2.1m) · 일반도로 · 가시설','백만원/m',8.113,K26+' p.15');
+add('box_one_par_slope','box','전력구 편측(1.7×2.1m) · 병행구간 · 구배','백만원/m',4.569,K26+' p.15');
+add('box_one_par_shore','box','전력구 편측(1.7×2.1m) · 병행구간 · 가시설','백만원/m',7.637,K26+' p.15');
+add('box_water','box','전력구 차수 (굴착 진행방향, 양측 물량 포함)','백만원/m',2.239,K26+' p.15');
+add('vent','box','환기구 (전력구·터널 공통)','백만원/개소',134.292,K26+' p.15·16');
+
+grp('tun', '터널 공사 (154·345kV)', '천원 → 백만원 · 터널굴진·구조물·부대 포함');
+var TUN = {
+  tbm:{n:'실드 TBM', d:3.0, mech:true, main:15.879, shaft:101.118, w:1},
+  semi:{n:'세미실드', d:2.6, mech:true, main:13.955, shaft:75.259, w:1},
+  natm:{n:'NATM', d:2.6, mech:false, main:21.555, shaft:75.259, w:1},
+  jack:{n:'강관압입(실드재킹)', d:2.4, mech:false, main:12.766, shaft:61.695, w:2},
+  mesa:{n:'메사실드', d:2.1, mech:false, main:31.590, shaft:37.327, w:2}
+};
+Object.keys(TUN).forEach(function(k){ var t = TUN[k];
+  add('tun_'+k+'_main','tun',t.n+' 본선 (기준 φ'+t.d+'m)','백만원/m',t.main,K26+' p.16');
+  add('tun_'+k+'_shaft','tun',t.n+' 수직구 (깊이 m당)','백만원/m',t.shaft,K26+' p.16');
+});
+add('tun_water1','tun','수직구 차수(1) — 실드TBM·세미실드·NATM','백만원/m',8.248,K26+' p.16');
+add('tun_water2','tun','수직구 차수(2) — 강관압입·메사실드','백만원/m',6.552,K26+' p.16');
+add('tun_slurry','tun','오탁수 처리시설 (발진 1,000t + 도달 200t)','백만원/조',583.528,K26+' p.16');
+
+grp('aux', '지중 부대설비공사', '천원/km → 백만원/km · 선택 항목');
+add('aux_elec','aux','전기공사 (동력·배전반·조명·배수·환기)','백만원/km',566.271,K26+' p.13');
+add('aux_fire_tun_ge','aux','소방공사 · 터널전력구 · 1km 이상','백만원/km',283.421,K26+' p.13');
+add('aux_fire_tun_lt','aux','소방공사 · 터널전력구 · 1km 미만','백만원/km',303.285,K26+' p.13');
+add('aux_fire_box_ge','aux','소방공사 · 개착전력구 · 1km 이상','백만원/km',213.753,K26+' p.13');
+add('aux_fire_box_lt','aux','소방공사 · 개착전력구 · 1km 미만','백만원/km',355.447,K26+' p.13');
+
+grp('d22', '22.9kV 배전', '23kV 개략공사비 산출서(2026.8, 이윤·일반관리비·경비 불포함) + 한전 표준');
+var S23 = '23kV 개략공사비 산출서(km당)';
+add('oh22_1','d22','가공 1회선 · 20MW (중하중 14m 전주 25기 + ACSR/AW-TR/OC 240㎟ 1km)','백만원/km',118.167,S23);
+add('oh22_2','d22','가공 2회선 · 40MW (중하중 14m 전주 30기 + 240㎟ 2km)','백만원/km',189.734,S23);
+add('oh22_3','d22','가공 3회선 · 50MW (고강도 16m 전주 40기 + 240㎟ 2km + 160㎟ 1km)','백만원/km',268.402,S23);
+add('oh22_4','d22','가공 3~4회선 · 60MW (고강도 16m 전주 45기 + 240㎟ 3km)','백만원/km',284.601,S23);
+add('oh22_std','d22','가공 한전 표준 · 고압 3상 (CH 16m, 160㎟+AL 95㎟, 변대·개폐기·감리 포함)','백만원/km',190,K26+' p.3');
+add('ug22_cable_CU','d22','지중 케이블 TR-CNCE-W/CU 600㎟ (1회선)','백만원/km',502.75,S23);
+add('ug22_cable_AL','d22','지중 케이블 TR-CNCE-W/AL 630㎟ (1회선)','백만원/km',227.8602,S23);
+add('ug22_duct_1','d22','지중 관로 ELP 200×2 (1회선용)','백만원/km',142.584,S23);
+add('ug22_duct_2','d22','지중 관로 ELP 200×3 (2회선용)','백만원/km',197.005,S23);
+add('ug22_duct_3','d22','지중 관로 ELP 200×4 (3~4회선용)','백만원/km',247.486,S23);
+add('ug22_mh','d22','지중 맨홀 MS-4','백만원/기',9.657,S23);
+add('ug22_std','d22','지중 한전 표준 · 고압 (175mm 4공, AL 400㎟, 500kVA 변압기 3·개폐기 4, 감리 포함)','백만원/km',683,K26+' p.3');
+
+grp('sea', '해저케이블 (참고 단가)', '억원/km → 백만원/km · 2019~2023 기준, 보정 필요');
+add('sea154_1','sea','154kV XLPE 500㎟×3심 · 1회선 (자재 12.0 + 설치 20.7억)','백만원/km',3270,'해저 공사비 산출 — 154kV 외부망(75km 미만)',{ref:true});
+add('sea154_2','sea','154kV XLPE 500㎟×3심 · 2회선 (자재 24.0 + 설치 29.64억)','백만원/km',5364,'해저 공사비 산출 — 154kV 외부망(75km 미만)',{ref:true});
+add('sea154_3','sea','154kV XLPE 500㎟×3심 · 3회선 (자재 36.0 + 설치 50.34억)','백만원/km',8634,'해저 공사비 산출 — 154kV 외부망(75km 미만)',{ref:true});
+add('sea345_2','sea','345kV XLPE 1,000㎟×3C · 2회선 (자재 3,525 + 설치 2,070백만)','백만원/km',11190,'해저 공사비 산출 — 신안 해상풍력 접속설비 검토(한전) 보정',{ref:true});
+add('hvdc500','sea','HVDC 500kV XLPE 2,500㎟ · 2C (75km 이상, 참고표만)','백만원/km',4170,'해저 공사비 산출 — 외부망 1,000MW~',{ref:true, tableOnly:true});
+
+grp('eq', '변전 · 접속설비', '자재+설치+운반 (보호반·Sh.C는 자재만)');
+var EQ = [
+ ['tr154','154kV 주변압기 60MVA(IED)','Bank',2078,K26+' p.2'],
+ ['tr345','345kV 주변압기 500MVA','Bank',4609,K26+' p.2'],
+ ['gis154','154kV GIS 50kA 2,000A(IED)','Bay',416,K26+' p.2'],
+ ['gis170_4000','170kV GIS 50kA 4,000A','CCT',432.061,K26+' p.22'],
+ ['gis345','345kV GIS 63kA 6,300A','Bay',1538,K26+' p.2'],
+ ['gis362_4000','362kV GIS 63kA 4,000A','CB',1135.341,K26+' p.22'],
+ ['gis362_8000','362kV GIS 63kA 8,000A','CB',2157.208,K26+' p.22'],
+ ['gis25','25.8kV GIS 25kA','CCT',66.638,K26+' p.22'],
+ ['shr345','345kV 분로리액터 100MVar','대',2177.110,K26+' p.22'],
+ ['shc154','154kV 전력용 콘덴서(Sh.C) 50MVar — 자재만','Bank',164.832,K26+' p.22'],
+ ['pcm154','154kV 송전선 보호반 PCM 전류차동 — 자재만','Set',55.384,K26+' p.23'],
+ ['pcm345','345kV 송전선 보호반 PCM 전류차동 — 자재만','Set',108.611,K26+' p.23'],
+ ['bld345o','345kV 변전소 토건 · 옥외형 (건물 연면적)','㎡',4.013,K26+' p.27'],
+ ['bld345i','345kV 변전소 토건 · 옥내형 (건물 연면적)','㎡',2.847,K26+' p.27'],
+ ['sw154','154kV 옥내형 표준개폐소 — 변전설비 (설계·감리 포함, 건축은 토목·건축 탭)','개소',8847.649,'154전력설비 개략공사비 산출표(고문) — 변전설비 한전 적서리 시행단가'],
+ ['ss154_1','154kV 발전사업자 변전소 1Bank — 변전설비 (설계·감리 포함, 건축은 토목·건축 탭)','개소',8551.740,'154전력설비 개략공사비 산출표(고문) — 확정 (v1.3 건축 분리)'],
+ ['ss154_2','154kV 발전사업자 변전소 2Bank — 변전설비 (설계·감리 포함, 건축은 토목·건축 탭)','개소',11972.791,'154전력설비 개략공사비 산출표(고문) — 확정 (v1.3 건축 분리)'],
+ ['ss154_3','154kV 발전사업자 변전소 3Bank — 변전설비 (설계·감리 포함, 건축은 토목·건축 탭)','개소',16680.934,'154전력설비 개략공사비 산출표(고문) — 확정 (v1.3 건축 분리)']
+];
+EQ.forEach(function(e){ add(e[0],'eq',e[1],'백만원/'+e[2],e[3],e[4],{qu:e[2]}); });
+
+grp('civ', '토목·건축 — 변전소·개폐소 (확정 v1.3)', '1개소·㎡·m 단가, 백만원 · 발전사업자 변전소 건축 30억 고정(사용자 확정) · 사내 실적은 단가만 표시');
+var SCIV = '사내 태양광 변전소 실적 기반 — 사용자 확정(2026-09-17)', SK26 = K26;
+// [id, 이름, 단위, 백만원, 출처, 분류(bld 건축 / cvx 추가토목·울타리), 설계·감리 규칙(none / bld / cv)]
+var CIV = [
+ ['bld_ss','154kV 발전사업자 변전소 건축 — 변전동·관리동, 부대토목·설계·감리 포함','개소',3000,SCIV+' (당시 실적 28~31억)','bld','none'],
+ ['bld_sw_in','154kV 옥내형 표준개폐소 건축 — 840㎡ RC, 부대토목·설계·감리 포함','개소',6750.878,'154전력설비 개략공사비 산출표(고문)','bld','none'],
+ ['bld_sw_out','154kV 옥외형 개폐소 건축 — 변전소 건축 준용','개소',3000,SCIV+' 준용','bld','none'],
+ ['bld_ref1','(참고) 고문 154kV 변전소 1Bank 건축 — 부대토목·설계·감리 포함','개소',3163.980,'154전력설비 개략공사비 산출표(고문)','bld','none'],
+ ['bld_ref2','(참고) 고문 154kV 변전소 2Bank 건축 — 1,200㎡ 기준','개소',4519.973,'154전력설비 개략공사비 산출표(고문)','bld','none'],
+ ['bld_ref3','(참고) 고문 154kV 변전소 3Bank 건축 — 2Bank÷0.7 추정','개소',6457.104,'154전력설비 개략공사비 산출표(고문)','bld','none'],
+ ['kb154_out','(참고) 한전 154kV 변전소 토건 · 옥외형 — 연면적','㎡',2.777,SK26+' p.28 (토목·조경 별도)','bld','bld'],
+ ['kb154_in','(참고) 한전 154kV 변전소 토건 · 옥내형 — 연면적','㎡',3.640,SK26+' p.28','bld','bld'],
+ ['kb154_ug','(참고) 한전 154kV 변전소 토건 · 지하형 — 연면적','㎡',3.569,SK26+' p.28','bld','bld'],
+ ['cv_earth','토공 (성토량 + 절토량, 사토처리 포함)','㎥',0.02561,SK26+' p.31 (2,561천원/100㎥)','cvx','cv'],
+ ['cv_slope','비탈면공','㎡',0.10124,SK26+' p.31','cvx','cv'],
+ ['cv_pave','도로포장','㎡',0.13336,SK26+' p.31','cvx','cv'],
+ ['cv_drain','배수설비','m',0.300,SK26+' p.31','cvx','cv'],
+ ['cv_wall','옹벽공 (H 3~5m, 3m 미만·5m 초과는 1m당 ±30%)','m',2.199,SK26+' p.31','cvx','cv'],
+ ['cv_land_out','조경 (옥외 GIS)','㎡',0.04517,SK26+' p.31','cvx','cv'],
+ ['cv_land_in','조경 (옥내 GIS)','㎡',0.09590,SK26+' p.31','cvx','cv'],
+ ['cv_sheet','파일공 · Sheet','㎡',0.123,SK26+' p.31','cvx','cv'],
+ ['cv_phc','파일공 · PHC (심도 10~16m)','m',0.121,SK26+' p.31','cvx','cv'],
+ ['cv_sda','파일공 · SDA','m',0.152,SK26+' p.31','cvx','cv'],
+ ['fn_bd','경계울타리','m',0.118,SK26+' p.29','cvx','cv'],
+ ['fn_s1','보안울타리 (단중)','m',0.348,SK26+' p.29','cvx','cv'],
+ ['fn_s2','보안울타리 (이중)','m',0.776,SK26+' p.29','cvx','cv'],
+ ['fn_tower','망루','동',44.267,SK26+' p.29','cvx','cv']
+];
+CIV.forEach(function(c){ add(c[0],'civ',c[1],'백만원/'+c[2],c[3],c[4],{qu:c[2], cc:c[5], dr:c[6]}); });
+add('bld_design','civ','건축 설계비율 (한전 토건 ㎡ 항목에 적용)','%',5,'154전력설비 개략공사비 산출표(고문) — 건축 설계 5%');
+add('bld_super','civ','건축 감리비율 (한전 토건 ㎡ 항목에 적용)','%',1.2,'154전력설비 개략공사비 산출표(고문) — 건축 감리 1.2%');
+
+grp('pkg', '154kV 지중 관로 패키지 (고문 산출표 — 확정)', '1회선·1km당 공사비 (천원 → 백만원), 설계 3.5%·감리 5%는 별도 행 · 사내 실적 대조 98%');
+var SG = '154전력설비 개략공사비 산출표(고문, 2026.6)';
+// [선종, 케이블 공사비(감리 제외), 지중토목, 케이블 성격]
+var PKG = [['400',990.285,964.384,'대한전선 견적'],['600',1185.000,964.384,'대한전선 견적'],['800',1469.714,964.384,'대한전선 견적'],
+ ['1200',1473.309,1060.822,'한전 2026 − 감리'],['2000',1970.790,1157.261,'한전 2026 − 감리'],['2500',2368.742,1253.699,'한전 2026 − 감리']];
+PKG.forEach(function(r){
+  add('pkgc_'+r[0],'pkg','케이블 XLPE '+comma(r[0])+'㎟ 1회선 — '+r[3],'백만원/km·회선',r[1],SG);
+  add('pkgv_'+r[0],'pkg','지중토목(관로·맨홀) '+comma(r[0])+'㎟용 1회선 — 기준값 964.384'+(r[2]!==964.384?' × '+fx(r[2]/964.384,1):'')+' (출처 미표기, 실적 대조 102%)','백만원/km·회선',r[2],SG);
+});
+add('pkg_design','pkg','설계비율 (송전 공사비 × %)','%',3.5,SG+' — 수식 C×0.035');
+add('pkg_super','pkg','감리비율 (송전 공사비 × %)','%',5,SG+' — 수식 C×0.05');
+
+var CAP154 = {
+  '1200':'허용전류 1회선 1,159A·308MVA / 2회선 966A·257MVA',
+  '2000':'허용전류 1회선 1,441A·383MVA / 2회선 1,196A·318MVA',
+  '2500':'허용전류 1회선 1,542A·410MVA / 2회선 1,278A·340MVA'
+};
+
+/* ───────────────────────── 유틸 ───────────────────────── */
+function comma(s){ return String(s).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function condLbl(c){ return c.replace('x', '㎟×').replace(/^(\d+)$/, '$1㎟'); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fx(n, d){ if (!isFinite(n)) n = 0; return n.toLocaleString('ko-KR', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+function fm(n){ return fx(n, Math.abs(n) >= 1000 ? 0 : (Math.abs(n) >= 10 ? 1 : 3)); }       // 백만원
+function fe(n){ return fx(n / 100, Math.abs(n) >= 100000 ? 0 : 1); }                           // 억원
+function fq(n){ return fx(n, Number.isInteger(n) ? 0 : (Math.abs(n) >= 100 ? 0 : 2)); }
+function $(id){ return document.getElementById(id); }
+function num(v, d){ var n = parseFloat(v); return isFinite(n) ? n : (d == null ? 0 : d); }
+function autoCnt(km){ return km > 0 ? Math.max(1, Math.round(km * 2)) : 0; }
+function toast(msg){ var t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ t.classList.remove('on'); }, 1800); }
+
+/* ───────────────────────── 상태 ───────────────────────── */
+var LS = 'kch.cost.elec.v1', LS_OV = 'kch.cost.elec.override.v1';
+var OV = {};
+try { OV = JSON.parse(localStorage.getItem(LS_OV) || '{}') || {}; } catch (e) { OV = {}; }
+function pr(id){ var o = OV[id]; return (o != null && isFinite(o)) ? o : P[id].v; }
+
+var METHODS = {'22.9':['oh22','ug22'], '154':['pkg','duct','box','tunnel','oh','sea'], '345':['oh','duct','box','tunnel','sea']};
+var MLBL = {pkg:'관로 · 고문 패키지', oh:'가공', oh22:'가공', duct:'관로 · 한전 조건별', ug22:'지중 · 관로', box:'지중 · 전력구', tunnel:'지중 · 터널', sea:'해저'};
+var PKGC = ['400', '600', '800', '1200', '2000', '2500'];
+var OHC = {'154':['410x2B','330x2B','410','330'], '345':['480x4B','480x2B']};
+var uid = 0;
+function newSeg(v, m, extra){
+  var s = {id:++uid, name:'', v:v || '154', m:m || 'oh', km:3, n:2, cond:'1200', region:'3', oh:'410x2B', scale:'1', cu:'AL',
+    lenMode:'auto', road:'gen', dig:'shore', rock:0, mh:'', mhWater:'0', side:'both', vent:'', water:'', extra:0, aux:'0',
+    tun:'tbm', dia:'', shafts:2, depth:30, tvent:'', twater:'', slurry:'', seaAdj:1, open:false};
+  if (s.v === '345') s.oh = '480x4B';
+  if (extra) for (var k in extra) s[k] = extra[k];
+  normalize(s);
+  return s;
+}
+/* ───────────────────────── 연계 용량 (v1.1) ───────────────────────── */
+// 회선당 연속허용전류 → MVA. 관로·전력구는 [1회선, 2회선, 3회선, 4회선] 설치 시 회선당 값 (송전선로_선종별_용량현황.xlsx)
+var CAPD = {
+  duct154:{'1200':[308,257,215,192], '2000':[383,318,264,235], '2500':[410,340,281,250]},
+  box154:{'1200':[354,354,348,348], '2000':[430,430,420,420], '2500':[459,459,446,446]},
+  box345:{'2000':[953,953,939,939], '2500':[1023,1023,1005,1005]},
+  oh:{'330':195, '410':226, '330x2B':390, '410x2B':452, '480x2B':1086, '480x4B':2173},
+  ns154:{'400':[178,147], '600':[220,182], '800':[249,205]}
+};
+var PF = 0.95;
+function defaultPlan(){ return {mw:70, max22:20, tr:100, util:80, m22:'ug22', cu:'AL', km22:2, m154:'pkg', km154:6, sel154:'auto'}; }
+function capMVA(v, m, cond, n){
+  var t = null, note = '';
+  if (m === 'pkg') {
+    if (v !== '154') return null;
+    if (CAPD.ns154[cond]) { if (n > 2) return null; return {mva:CAPD.ns154[cond][n - 1], note:'한전 비표준 관로식(1·2회선 자료)'}; }
+    t = CAPD.duct154[cond];
+  }
+  else if (m === 'duct') { t = v === '154' ? CAPD.duct154[cond] : null; if (!t && v === '345' && CAPD.box345[cond]) { t = CAPD.box345[cond]; note = '345kV 관로 자료 없음 — 전력구 값 준용'; } }
+  else if (m === 'box' || m === 'tunnel') { t = (v === '154' ? CAPD.box154 : CAPD.box345)[cond]; if (m === 'tunnel') note = '터널은 전력구 허용전류 준용'; }
+  else if (m === 'oh') { return CAPD.oh[cond] ? {mva:CAPD.oh[cond], note:''} : null; }
+  else if (m === 'sea' && v === '154') { return {mva:125, note:'해저 XLPE 500㎟ 1도체 기준(신안 안좌–화원 사례)'}; }
+  if (!t) return null;
+  if (n > 4) note = (note ? note + ' · ' : '') + '4회선 초과 — 4회선 값 적용';
+  return {mva:t[Math.min(n, 4) - 1], note:note};
+}
+function segCap(s, plan){
+  plan = plan || S.plan;
+  var u = num(plan.util, 80) / 100, n = Math.max(1, s.n | 0);
+  if (s.v === '22.9') {
+    if (s.scale === 'std') return {mw:10, basis:'한전 표준 1회선 — 상시운전용량 10MW'};
+    var c = +s.scale; return {mw:c * num(plan.max22, 20), basis:c + '회선 × 회선당 최대 ' + num(plan.max22, 20) + 'MW'};
+  }
+  if (s.m === 'sea' && s.v === '345') return {mw:323, basis:'해저 1,000㎟×3C 2회선 323MW (사례값)'};
+  var cond = s.m === 'oh' ? s.oh : (s.m === 'sea' ? '500' : s.cond);
+  var c2 = capMVA(s.v, s.m, cond, n);
+  if (!c2) return {mw:null, basis:'용량 자료 없음'};
+  return {mw:n * c2.mva * u * PF, basis:n + '회선 × ' + c2.mva + 'MVA × 이용률 ' + num(plan.util, 80) + '% × 역률 0.95' + (c2.note ? ' (' + c2.note + ')' : '')};
+}
+var M154 = ['pkg', 'duct', 'box', 'tunnel', 'oh', 'sea'];
+function condsOf(m){ return m === 'pkg' ? PKGC : (m === 'oh' ? ['330', '410', '330x2B', '410x2B'] : (m === 'sea' ? ['500'] : ['1200', '2000', '2500'])); }
+function nsOf(m){ return m === 'oh' ? [2, 4] : (m === 'sea' ? [1, 2, 3] : [1, 2, 3, 4]); }
+function condName(m, cd){ return m === 'oh' ? 'ACSR ' + condLbl(cd) : (m === 'sea' ? 'XLPE 500㎟×3심' : 'XLPE ' + comma(cd) + '㎟'); }
+function planCalc(p){
+  var mw = Math.max(0, num(p.mw)), max22 = Math.max(1, num(p.max22, 20)), tr = Math.max(1, num(p.tr, 100)), u = num(p.util, 80) / 100;
+  var n22 = Math.max(1, Math.ceil(mw / max22)), k = Math.max(1, Math.ceil(mw / tr));
+  var alts = [];
+  M154.forEach(function(m){
+    condsOf(m).forEach(function(cd){
+      var ns = nsOf(m), best = null, last = null;
+      ns.forEach(function(n){ var c = capMVA('154', m, cd, n); if (!c) return; var cap = n * c.mva * u * PF; last = {n:n, cap:cap}; if (!best && cap >= mw) best = {n:n, cap:cap}; });
+      alts.push({m:m, cond:cd, n:best ? best.n : null, cap:best ? best.cap : (last ? last.cap : 0)});
+    });
+  });
+  var inM = alts.filter(function(a){ return a.m === p.m154 && a.n; });
+  inM.sort(function(a, b){ return a.n - b.n; });
+  var rec = inM[0] || null, sel = rec;
+  if (p.sel154 && p.sel154 !== 'auto') {
+    var sp = String(p.sel154).split('|'), sn = +sp[1], c = capMVA('154', p.m154, sp[0], sn);
+    if (c && condsOf(p.m154).indexOf(sp[0]) >= 0 && nsOf(p.m154).indexOf(sn) >= 0) sel = {m:p.m154, cond:sp[0], n:sn, cap:sn * c.mva * u * PF};
+  }
+  var warns = [];
+  if (n22 > 8) warns.push('22.9kV ' + n22 + '회선 — 8회선을 넘으면 단지 안에 승압변전소를 나눠 두는 구성을 검토하세요 (산출은 8회선까지)');
+  if (mw > 500) warns.push('500MW 초과 — 345kV 연계 검토 권장 (한전 접속기준 500~1,000MW는 345kV 또는 154kV 4회선)');
+  if (!rec) warns.push('선택한 154kV 방식으로는 허용 회선수 안에서 ' + fx(mw, 0) + 'MW를 보낼 수 없습니다 — 다른 방식을 고르세요');
+  if (sel && sel.cap < mw) warns.push('선택한 154kV 구성의 송전 가능 용량(' + fx(sel.cap, 0) + 'MW)이 발전용량보다 작습니다');
+  if (k > 3) warns.push('변압기 ' + k + '대 — 변전소 단가는 3Bank 패키지 + 추가 변압기(154kV 60MVA 단가)로 계산됩니다');
+  return {mw:mw, max22:max22, tr:tr, u:u, n22:n22, cap22:n22 * max22, k:k, trCap:k * tr, rec:rec, sel:sel, alts:alts, warns:warns};
+}
+function planBuild(p){
+  var R = planCalc(p), segs = [], eq = [], civ = [];
+  var n22 = Math.min(8, R.n22);
+  segs.push(newSeg('22.9', p.m22, {name:'22.9kV 연계선로 (발전단지 → 승압변전소)', km:num(p.km22, 1), scale:String(n22), cu:p.cu || 'AL'}));
+  if (R.sel) {
+    var ex = {name:'154kV 송전선로 (승압변전소 → 한전 변전소)', km:num(p.km154, 1), n:R.sel.n};
+    if (p.m154 === 'oh') ex.oh = R.sel.cond; else if (p.m154 !== 'sea') ex.cond = R.sel.cond;
+    segs.push(newSeg('154', p.m154, ex));
+    if (R.k <= 3) eq.push({id:'ss154_' + R.k, q:1}); else { eq.push({id:'ss154_3', q:1}); eq.push({id:'tr154', q:R.k - 3}); }
+    civ.push({id:'bld_ss', q:1});
+    eq.push({id:'gis154', q:R.sel.n});
+    eq.push({id:'pcm154', q:R.sel.n * 2});
+  }
+  return {segs:segs, eq:eq, civ:civ};
+}
+
+function defaultState(){
+  uid = 0;
+  var plan = defaultPlan(), b = planBuild(plan);
+  return {
+    proj:'예시 — 태양광 70MW 연계 (22.9kV → 승압변전소 → 154kV)',
+    plan:plan,
+    segs:b.segs,
+    eq:b.eq,
+    civ:b.civ,
+    civx:{},
+    r:{design:0, overhead:0, cont:0, year:2026, esc:3},
+    cmp:{v:'154', km:5, n:2, cond:'1200'}
+  };
+}
+var S;
+try { S = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { S = null; }
+if (!S || !S.segs) S = defaultState();
+S.segs.forEach(function(s){ uid = Math.max(uid, s.id || 0); });
+S.segs.forEach(function(s){ if (!s.id) s.id = ++uid; normalize(s); });
+S.r = S.r || {design:0, overhead:0, cont:0, year:2026, esc:3};
+S.cmp = S.cmp || {v:'154', km:5, n:2, cond:'1200'};
+S.plan = S.plan || defaultPlan();
+// v1.3: 전기 탭 변전소 패키지에서 건축이 빠졌으므로, 이전 저장 상태에는 변전소 개수만큼 건축을 채워 넣음
+if (!S.civ) { var nss = 0; (S.eq || []).forEach(function(e){ if (/^ss154_/.test(e.id)) nss += num(e.q); }); S.civ = nss ? [{id:'bld_ss', q:nss}] : []; }
+S.civx = S.civx || {};
+function save(){ try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+
+function normalize(s){
+  var ms = METHODS[s.v] || METHODS['154'];
+  if (ms.indexOf(s.m) < 0) {
+    if (s.v === '22.9') s.m = (s.m === 'oh') ? 'oh22' : 'ug22';
+    else s.m = (s.m === 'oh22') ? 'oh' : ((s.m === 'ug22' || s.m === 'pkg') ? 'duct' : 'oh');
+  }
+  if (s.m === 'oh') { if (OHC[s.v].indexOf(s.oh) < 0) s.oh = OHC[s.v][0]; if (s.n !== 2 && s.n !== 4) s.n = s.n > 2 ? 4 : 2; }
+  if (s.m === 'sea') { if (s.v === '345') s.n = 2; else s.n = Math.min(3, Math.max(1, s.n | 0)); }
+  if (s.m === 'box' || s.m === 'tunnel' || s.m === 'duct' || s.m === 'pkg') s.n = Math.max(1, s.n | 0);
+  if (s.m === 'pkg' && PKGC.indexOf(String(s.cond)) < 0) s.cond = '1200';
+  if ((s.m === 'box' || s.m === 'tunnel' || s.m === 'duct') && ['1200', '2000', '2500'].indexOf(String(s.cond)) < 0) s.cond = '1200';
+  if (['oh22','ug22'].indexOf(s.m) >= 0 && ['1','2','3','4','5','6','7','8','std'].indexOf(String(s.scale)) < 0) s.scale = '1';
+  if (s.m === 'box' && s.road === 'gen') s.dig = 'shore';
+  if (!TUN[s.tun]) s.tun = 'tbm';
+}
+
+/* ───────────────────────── 계산 ───────────────────────── */
+function calcSeg(s){
+  var L = [], W = [], km = Math.max(0, num(s.km)), m = km * 1000, n = Math.max(0, s.n | 0);
+  function push(cat, name, qty, unit, id, f, note){
+    f = f == null ? 1 : f;
+    var p = pr(id) * f;
+    L.push({cat:cat, name:name, qty:qty, unit:unit, price:p, amt:qty * p, src:P[id].src + (note ? ' · ' + note : ''), id:id});
+  }
+  function cable(){
+    var lt = s.lenMode === 'lt' || (s.lenMode === 'auto' && km > 0 && km < 1);
+    push('wire', '케이블 XLPE ' + comma(s.cond) + '㎟ × ' + n + '회선 (' + (lt ? '1km 미만' : '1km 이상') + ')', n * km, 'C-km', 'cb_' + s.v + '_' + s.cond + '_' + (lt ? 'lt' : 'ge'));
+    if (lt) W.push({t:'w', m:'1km 미만 케이블 단가 적용 (종단접속설비 포함 공사일 때만)'});
+  }
+  var ROAD = {gen:'일반도로', par:'병행구간'}, DIG = {slope:'구배', shore:'가시설'};
+  switch (s.m) {
+    case 'pkg': {
+      var pc = PKGC.indexOf(String(s.cond)) >= 0 ? String(s.cond) : '1200';
+      push('wire', '케이블 XLPE ' + comma(pc) + '㎟ × ' + n + '회선 (고문 산출표, 감리 제외)', n * km, 'km·회선', 'pkgc_' + pc);
+      push('civil', '지중토목 (관로·맨홀) × ' + n + '회선 (고문 산출표)', n * km, 'km·회선', 'pkgv_' + pc);
+      var pb = L[L.length - 1].amt + L[L.length - 2].amt;
+      push('des', '설계비 (공사비 × ' + fx(pr('pkg_design'), 1) + '%)', pb, '백만원', 'pkg_design', 0.01);
+      push('des', '감리비 (공사비 × ' + fx(pr('pkg_super'), 1) + '%)', pb, '백만원', 'pkg_super', 0.01);
+      if (CAPD.ns154[pc] && n > 2) W.push({t:'w', m:'400~800㎟ 비표준 케이블은 1·2회선 용량 자료만 있음'});
+      break;
+    }
+    case 'oh': {
+      var id = 'oh_' + s.v + '_' + s.region + '_' + n + '_' + s.oh;
+      push('wire', '가공송전 ' + n + '회선 ACSR ' + condLbl(s.oh) + ' (풍압지역 ' + s.region + ')', km, 'km', id);
+      break;
+    }
+    case 'duct': {
+      cable();
+      var f = n <= 2 ? 0.85 : (n <= 4 ? 1 : 1.15), rk = [1, 1.09, 1.24][s.rock | 0] || 1, ff = f * rk;
+      var fn = (f !== 1 ? (f < 1 ? '2회선 −15%' : '6회선 +15%') : '') + (rk > 1 ? (f !== 1 ? ', ' : '') + '암비율 +' + Math.round((rk - 1) * 100) + '%' : '');
+      push('civil', '관로 본선 (' + ROAD[s.road] + '·' + DIG[s.dig] + ')', m, 'm', 'duct_' + s.road + '_' + s.dig, ff, fn);
+      var mh = s.mh === '' || s.mh == null ? autoCnt(km) : Math.max(0, num(s.mh));
+      var mhid = s.road === 'gen' ? 'mh_gen_shore' : 'mh_par_' + s.dig;
+      push('civil', '맨홀 (' + ROAD[s.road] + '·' + (s.road === 'gen' ? '가시설' : DIG[s.dig]) + ')', mh, '개소', mhid, ff, fn);
+      if (s.mhWater === '1') push('civil', '맨홀 차수', mh, '개소', 'mh_water');
+      if (s.v === '345') W.push({t:'r', m:'345kV 관로: 원본 표에 154kV만 있어 154kV 단가 준용'});
+      if (n > 6) W.push({t:'w', m:'관로 단가는 6회선까지 정의 — 7회선 이상은 +15%로 계산(검토 필요)'});
+      if (s.road === 'gen' && s.dig === 'slope') W.push({t:'w', m:'일반도로 구배 맨홀 단가가 없어 가시설 맨홀 단가 적용'});
+      break;
+    }
+    case 'box': {
+      cable();
+      var ex = Math.max(0, num(s.extra)), bf = 1 + 1.4 * ex;
+      push('civil', '전력구 ' + (s.side === 'both' ? '양측 2.1×2.1m' : '편측 1.7×2.1m') + ' (' + ROAD[s.road] + '·' + DIG[s.dig] + ')', m, 'm', 'box_' + s.side + '_' + s.road + '_' + s.dig, bf, ex ? '추가단면 ' + ex + ' × 1.4' : '');
+      var wa = Math.max(0, num(s.water));
+      if (wa) push('civil', '전력구 차수', wa, 'm', 'box_water');
+      var vc = s.vent === '' || s.vent == null ? autoCnt(km) : Math.max(0, num(s.vent));
+      if (vc) push('civil', '환기구', vc, '개소', 'vent');
+      if (s.aux === '1') {
+        push('aux', '부대설비 · 전기공사', km, 'km', 'aux_elec');
+        push('aux', '부대설비 · 소방 (개착전력구 ' + (km < 1 ? '1km 미만' : '1km 이상') + ')', km, 'km', km < 1 ? 'aux_fire_box_lt' : 'aux_fire_box_ge');
+      }
+      break;
+    }
+    case 'tunnel': {
+      cable();
+      var T = TUN[s.tun], d = num(s.dia, T.d) || T.d, df = 1, dn = '';
+      if (d > T.d) { df = T.mech ? 1 + (d - T.d) * 0.307 : Math.pow(d / T.d, 2); dn = T.mech ? '직경 +' + fx(d - T.d, 1) + 'm × 30.7%' : '단면비율 ×' + fx(df, 3); }
+      push('civil', '터널 본선 · ' + T.n + ' (φ' + d + 'm)', m, 'm', 'tun_' + s.tun + '_main', df, dn);
+      var sc = Math.max(0, num(s.shafts)), sd = Math.max(0, num(s.depth));
+      if (sc && sd) push('civil', '수직구 · ' + T.n + ' (' + sc + '개소 × 깊이 ' + sd + 'm)', sc * sd, 'm', 'tun_' + s.tun + '_shaft');
+      var tv = Math.max(0, num(s.tvent)); if (tv) push('civil', '환기구', tv, '개소', 'vent');
+      var tw = Math.max(0, num(s.twater)); if (tw) push('civil', '수직구 차수', tw, 'm', T.w === 1 ? 'tun_water1' : 'tun_water2');
+      var sl = s.slurry === '' || s.slurry == null ? (T.mech ? 1 : 0) : Math.max(0, num(s.slurry));
+      if (sl) push('civil', '오탁수 처리시설', sl, '조', 'tun_slurry');
+      if (s.aux === '1') {
+        push('aux', '부대설비 · 전기공사', km, 'km', 'aux_elec');
+        push('aux', '부대설비 · 소방 (터널전력구 ' + (km < 1 ? '1km 미만' : '1km 이상') + ')', km, 'km', km < 1 ? 'aux_fire_tun_lt' : 'aux_fire_tun_ge');
+      }
+      break;
+    }
+    case 'sea': {
+      var adj = num(s.seaAdj, 1) || 1;
+      if (s.v === '345') push('wire', '해저케이블 345kV XLPE 1,000㎟×3C × 2회선', km, 'km', 'sea345_2', adj, adj !== 1 ? '보정 ×' + adj : '');
+      else push('wire', '해저케이블 154kV XLPE 500㎟×3심 × ' + n + '회선', km, 'km', 'sea154_' + n, adj, adj !== 1 ? '보정 ×' + adj : '');
+      W.push({t:'r', m:'해저: 2019~2023 기준 참고 단가 — 보정계수로 물가 반영 필요, 양륙부·접속함·보호공 불포함'});
+      break;
+    }
+    case 'oh22': {
+      if (s.scale === 'std') { push('wire', P.oh22_std.name.replace(/^가공 /, '22.9kV 가공 '), km, 'km', 'oh22_std'); break; }
+      // 산출서는 한 경과지(전주 1열)에 최대 3~4회선 → 4회선을 넘으면 경과지를 나눠 합산
+      var c1 = +s.scale, left1 = c1, ri1 = 0, routes1 = Math.ceil(c1 / 4);
+      while (left1 > 0) { var r1 = Math.min(4, left1); left1 -= r1; ri1++;
+        push('wire', P['oh22_' + r1].name.replace(/^가공 /, '22.9kV 가공 ') + (routes1 > 1 ? ' · 경과지 ' + ri1 : ''), km, 'km', 'oh22_' + r1); }
+      if (routes1 > 1) W.push({t:'w', m:'22.9kV 가공 5회선 이상: 4회선 단위로 경과지를 나눠 합산(가정)'});
+      W.push({t:'w', m:'22.9kV 산출서 단가: 이윤·일반관리비·경비 불포함'});
+      break;
+    }
+    case 'ug22': {
+      if (s.scale === 'std') { push('wire', '22.9kV 지중 한전 표준 (관로·케이블·기기·감리)', km, 'km', 'ug22_std'); break; }
+      var c = +s.scale, routes = Math.ceil(c / 4), left = c, ri = 0;
+      push('wire', '케이블 TR-CNCE-W/' + (s.cu === 'CU' ? 'CU 600㎟' : 'AL 630㎟') + ' × ' + c + '회선', c * km, 'C-km', 'ug22_cable_' + s.cu);
+      while (left > 0) { var r = Math.min(4, left), di = Math.min(3, r); left -= r; ri++;
+        push('civil', '관로 ELP 200×' + (di + 1) + (routes > 1 ? ' · 관로 ' + ri : ''), km, 'km', 'ug22_duct_' + di); }
+      var mc = s.mh === '' || s.mh == null ? autoCnt(km) * routes : Math.max(0, num(s.mh));
+      push('civil', '맨홀 MS-4', mc, '기', 'ug22_mh');
+      if (routes > 1) W.push({t:'w', m:'22.9kV 지중 5회선 이상: 4회선 단위로 관로를 나눠 합산(가정)'});
+      W.push({t:'w', m:'22.9kV 산출서 단가: 이윤·일반관리비·경비 불포함'});
+      break;
+    }
+  }
+  // 설계·감리 자동 (고문 규칙): 한전 케이블 C-km 단가는 감리 포함 → 설계만, 한전 토목 단가 → 설계 + 감리
+  if (S && S.r && S.r.autoDes !== '0' && ['duct', 'box', 'tunnel'].indexOf(s.m) >= 0) {
+    var dcb = 0, dcv = 0;
+    L.forEach(function(l){ if (l.cat === 'wire' && /^cb_/.test(l.id)) dcb += l.amt; if (l.cat === 'civil') dcv += l.amt; });
+    if (dcb) push('des', '설계비 — 케이블 (한전 단가에 감리 포함 → 설계 ' + fx(pr('pkg_design'), 1) + '%만)', dcb, '백만원', 'pkg_design', 0.01);
+    if (dcv) { push('des', '설계비 — 토목 (' + fx(pr('pkg_design'), 1) + '%)', dcv, '백만원', 'pkg_design', 0.01); push('des', '감리비 — 토목 (' + fx(pr('pkg_super'), 1) + '%)', dcv, '백만원', 'pkg_super', 0.01); }
+  }
+  var tot = 0; L.forEach(function(l){ tot += l.amt; });
+  return {lines:L, total:tot, warns:W, km:km};
+}
+
+function calcAll(){
+  var segR = S.segs.map(calcSeg);
+  var cats = {wire:0, civil:0, aux:0, des:0, eq:0};
+  var km = 0, lineSum = 0;
+  segR.forEach(function(r){ km += r.km; r.lines.forEach(function(l){ cats[l.cat] += l.amt; lineSum += l.amt; }); });
+  var eqL = S.eq.filter(function(e){ return P[e.id]; }).map(function(e){
+    var p = pr(e.id), q = Math.max(0, num(e.q));
+    return {cat:'eq', name:P[e.id].name, qty:q, unit:P[e.id].qu, price:p, amt:p * q, src:P[e.id].src, id:e.id};
+  });
+  eqL.forEach(function(l){ cats.eq += l.amt; });
+  // 토목·건축 (변전소·개폐소)
+  cats.bld = 0; cats.cvx = 0;
+  var civL = [];
+  function civLine(id, q){ var p = P[id]; if (!p || !(q > 0)) return; var u = pr(id); civL.push({cat:p.cc, name:p.name, qty:q, unit:p.qu, price:u, amt:u * q, src:p.src, id:id, dr:p.dr}); }
+  (S.civ || []).forEach(function(e){ civLine(e.id, Math.max(0, num(e.q))); });
+  Object.keys(S.civx || {}).forEach(function(id){ civLine(id, Math.max(0, num(S.civx[id]))); });
+  var dB = 0, dC = 0;
+  civL.forEach(function(l){ cats[l.cat] += l.amt; if (l.dr === 'bld') dB += l.amt; if (l.dr === 'cv') dC += l.amt; });
+  if (S.r.autoDes !== '0') {
+    [[dB, 'bld_design', '설계비 — 건축(한전 토건) '], [dB, 'bld_super', '감리비 — 건축(한전 토건) '], [dC, 'pkg_design', '설계비 — 추가 토목·울타리 '], [dC, 'pkg_super', '감리비 — 추가 토목·울타리 ']].forEach(function(x){
+      if (!x[0]) return; var rt = pr(x[1]) / 100;
+      civL.push({cat:'des', name:x[2] + fx(pr(x[1]), 1) + '%', qty:x[0], unit:'백만원', price:rt, amt:x[0] * rt, src:P[x[1]].src, id:x[1], dr:'none'});
+      cats.des += x[0] * rt;
+    });
+  }
+  var civTotal = 0; civL.forEach(function(l){ civTotal += l.amt; });
+  var direct = cats.wire + cats.civil + cats.aux + cats.des + cats.eq + cats.bld + cats.cvx;
+  var r = S.r;
+  var design = direct * num(r.design) / 100, over = direct * num(r.overhead) / 100;
+  var cont = (direct + design + over) * num(r.cont) / 100;
+  var base = direct + design + over + cont;
+  var yrs = num(r.year, 2026) - 2026, ef = Math.pow(1 + num(r.esc) / 100, yrs);
+  var escAmt = base * (ef - 1);
+  return {segR:segR, eqL:eqL, civL:civL, civTotal:civTotal, elecDirect:direct - civTotal, cats:cats, km:km, lineSum:lineSum, direct:direct, design:design, over:over, cont:cont, esc:escAmt, ef:ef, yrs:yrs, total:base + escAmt};
+}
+
+/* ───────────────────────── 렌더: 구간 ───────────────────────── */
+function pills(f, opts, cur, cls, dis){
+  return '<div class="pills ' + (cls || '') + '" data-f="' + f + '">' + opts.map(function(o){
+    var v = o[0], on = String(v) === String(cur), d = dis && dis(v);
+    return '<button type="button" data-val="' + esc(v) + '"' + (on ? ' class="on"' : '') + (d ? ' disabled' : '') + '>' + o[1] + '</button>';
+  }).join('') + '</div>';
+}
+function fld(label, ctl, hint, cls){ return '<div class="f ' + (cls || '') + '"><label>' + label + '</label>' + ctl + (hint ? '<div class="h">' + hint + '</div>' : '') + '</div>'; }
+function ninput(f, v, u, ph, step){ return '<div class="ctl"><input type="number" data-f="' + f + '" value="' + esc(v) + '"' + (ph != null ? ' placeholder="' + esc(ph) + '"' : '') + ' step="' + (step || 'any') + '" min="0">' + (u ? '<span class="u">' + u + '</span>' : '') + '</div>'; }
+function sel(f, opts, cur){ return '<select data-f="' + f + '">' + opts.map(function(o){ return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; }
+
+function segFields(s){
+  var h = '', km = Math.max(0, num(s.km));
+  h += fld('긍장', ninput('km', s.km, 'km', null, '0.1'));
+  var condOpts = [['2500','2,500㎟'],['2000','2,000㎟'],['1200','1,200㎟']];
+  var lenOpts = [['auto','자동'],['ge','1km 이상'],['lt','1km 미만']];
+  var roadOpts = [['gen','일반도로'],['par','병행구간']], digOpts = [['slope','구배'],['shore','가시설']];
+  var auxOpts = [['0','제외'],['1','포함']];
+  switch (s.m) {
+    case 'pkg':
+      h += fld('회선', ninput('n', s.n, '회선', null, '1'), '1회선 단가 × 회선수');
+      h += fld('선종 (XLPE)', pills('cond', PKGC.map(function(c){ return [c, comma(c) + '㎟']; }), s.cond),
+        (CAPD.ns154[s.cond] ? '대한전선 견적 · 비표준 · 1회선 ' + CAPD.ns154[s.cond][0] + 'MVA / 2회선 각 ' + CAPD.ns154[s.cond][1] + 'MVA' : '한전 2026 케이블 − 감리 · ' + (CAP154[s.cond] || '')), 'full');
+      h += fld('포함 항목', '<div class="ctl"><input disabled value="케이블 + 지중토목(관로·맨홀) + 설계 3.5% + 감리 5%"></div>', '고문 산출표 확정 단가 · 사내 실적 대조 98%', 'wide');
+      break;
+    case 'oh':
+      h += fld('회선', pills('n', [[2,'2회선'],[4,'4회선']], s.n));
+      h += fld('선종 (ACSR)', sel('oh', OHC[s.v].map(function(c){ return [c, condLbl(c)]; }), s.oh));
+      h += fld('풍압지역', pills('region', [['3','3 (기준)'],['2','2']], s.region), '표준경간 ' + (s.v === '154' ? '400' : '450') + 'm');
+      h += fld('참고 철탑 수', '<div class="ctl"><input disabled data-auto="tower"><span class="u">기</span></div>', '긍장 ÷ 표준경간 + 1');
+      break;
+    case 'duct': case 'box': case 'tunnel':
+      h += fld('회선', ninput('n', s.n, '회선', null, '1'), s.m === 'duct' ? '4회선 기준 · 2회선 −15% · 6회선 +15%' : '');
+      h += fld('선종 (XLPE)', pills('cond', condOpts, s.cond), s.v === '154' ? CAP154[s.cond] : '', 'wide');
+      h += fld('케이블 긍장 구분', pills('lenMode', lenOpts, s.lenMode), '1km 미만 = 종단접속 포함 공사만');
+      if (s.m === 'duct') {
+        h += fld('도로 구분', pills('road', roadOpts, s.road));
+        h += fld('굴착', pills('dig', digOpts, s.dig));
+        h += fld('암비율 할증', pills('rock', [[0,'20% 이내'],[1,'20~50% · 9%'],[2,'50%↑ · 24%']], s.rock), '', 'wide');
+        h += fld('맨홀 개수', ninput('mh', s.mh, '개소', '자동 ' + autoCnt(km), '1'), '비우면 1km당 2개소');
+        h += fld('맨홀 차수', pills('mhWater', [['0','없음'],['1','적용']], s.mhWater));
+      }
+      if (s.m === 'box') {
+        h += fld('형태', pills('side', [['both','양측 2.1m'],['one','편측 1.7m']], s.side));
+        h += fld('도로 구분', pills('road', roadOpts, s.road));
+        h += fld('굴착', pills('dig', digOpts, s.dig, '', function(v){ return s.road === 'gen' && v === 'slope'; }), s.road === 'gen' ? '일반도로는 가시설 단가만 있음' : '');
+        h += fld('환기구 개수', ninput('vent', s.vent, '개소', '자동 ' + autoCnt(km), '1'), '비우면 1km당 2개소');
+        h += fld('차수 연장', ninput('water', s.water, 'm', '0'));
+        h += fld('추가 단면 수', ninput('extra', s.extra, '단면', null, '1'), '추가 1단면당 ×1.4 가산');
+        h += fld('부대설비 (전기·소방)', pills('aux', auxOpts, s.aux));
+      }
+      if (s.m === 'tunnel') {
+        var T = TUN[s.tun];
+        h += fld('공법', sel('tun', Object.keys(TUN).map(function(k){ return [k, TUN[k].n + (TUN[k].mech ? ' (기계식)' : ' (인력식)')]; }), s.tun), '', 'wide');
+        h += fld('터널 직경', ninput('dia', s.dia, 'm', '기준 ' + T.d, '0.1'), T.mech ? '초과 1m당 +30.7%' : '초과 시 단면비율');
+        h += fld('수직구 개수', ninput('shafts', s.shafts, '개소', null, '1'));
+        h += fld('수직구 깊이', ninput('depth', s.depth, 'm', null, '1'));
+        h += fld('환기구', ninput('tvent', s.tvent, '개소', '0', '1'));
+        h += fld('수직구 차수', ninput('twater', s.twater, 'm', '0'));
+        h += fld('오탁수 처리시설', ninput('slurry', s.slurry, '조', '자동 ' + (T.mech ? 1 : 0), '1'));
+        h += fld('부대설비 (전기·소방)', pills('aux', auxOpts, s.aux));
+      }
+      break;
+    case 'sea':
+      if (s.v === '345') h += fld('회선', '<div class="ctl"><input disabled value="2회선 (단가 기준)"></div>', 'XLPE 1,000㎟×3C, 323MW');
+      else h += fld('회선', pills('n', [[1,'1회선'],[2,'2회선'],[3,'3회선']], s.n), 'XLPE 500㎟×3심 · 100/200/400MW');
+      h += fld('보정계수', ninput('seaAdj', s.seaAdj, '배', null, '0.01'), '2019~23 단가 → 현재 물가 반영');
+      break;
+    case 'oh22':
+      h += fld('회선수', sel('scale', scaleOpts('한전 표준 (고압 3상, 10MW)'), s.scale), '회선당 최대 ' + num(S.plan.max22, 20) + 'MW (연계 구성 기준)', 'wide');
+      break;
+    case 'ug22':
+      h += fld('회선수', sel('scale', scaleOpts('한전 표준 (AL 400㎟, 기기·감리 포함, 10MW)'), s.scale), '회선당 최대 ' + num(S.plan.max22, 20) + 'MW (연계 구성 기준)', 'wide');
+      if (s.scale !== 'std') {
+        h += fld('도체', pills('cu', [['AL','AL 630㎟'],['CU','CU 600㎟']], s.cu));
+        h += fld('맨홀 개수', ninput('mh', s.mh, '기', '자동 ' + autoCnt(km), '1'), '비우면 1km당 2기');
+      }
+      break;
+  }
+  return h;
+}
+
+function scaleOpts(stdLabel){
+  var mx = num(S.plan.max22, 20), o = [];
+  for (var i = 1; i <= 8; i++) o.push([String(i), i + '회선 · 최대 ' + fx(i * mx, 0) + 'MW']);
+  o.push(['std', stdLabel]);
+  return o;
+}
+
+function segCard(s, i){
+  var ms = METHODS[s.v];
+  return '<article class="card segc" data-i="' + i + '" data-id="' + s.id + '">' +
+    '<div class="segh"><span class="segno">' + (i + 1) + '</span>' +
+      '<input class="segname" data-f="name" value="' + esc(s.name) + '" placeholder="구간 이름 (예: 해안 양륙 ~ 변전소)">' +
+      '<span class="tag v">' + s.v + 'kV · ' + MLBL[s.m] + '</span>' +
+      '<button class="x" data-act="dup" title="복제"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>' +
+      '<button class="x" data-act="del" title="삭제"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>' +
+    '</div>' +
+    '<div class="segb">' +
+      '<div class="row"><span class="lbl">전압</span>' + pills('v', [['22.9','22.9kV'],['154','154kV'],['345','345kV']], s.v, 'big') + '</div>' +
+      '<div class="row"><span class="lbl">방식</span>' + pills('m', ms.map(function(m){ return [m, MLBL[m] + (m === 'sea' ? ' <small style="opacity:.7">참고</small>' : '')]; }), s.m, 'big') + '</div>' +
+      '<div class="fields">' + segFields(s) + '</div>' +
+    '</div>' +
+    '<div class="segf"><span class="tot num" data-r="tot">0<small>억원</small></span><span class="pk" data-r="pk"></span>' +
+      '<span class="cap na" data-r="cap"></span>' +
+      '<span class="warns" data-r="warns"></span>' +
+      '<span class="sp"><button class="btn sm" data-act="lines">' + (s.open ? '내역 닫기' : '내역 보기') + '</button></span></div>' +
+    '<div class="lines' + (s.open ? ' on' : '') + '" data-r="lines"></div>' +
+  '</article>';
+}
+
+var CATN = {wire:'선로 · 케이블', civil:'토목 (관로·전력구·터널)', aux:'부대설비', des:'설계 · 감리', eq:'변전 · 접속설비', bld:'건축 (변전소·개폐소)', cvx:'추가 토목 · 울타리', ind:'간접비 · 예비비 · 물가'};
+var CATC = {wire:'var(--c-wire)', civil:'var(--c-civil)', aux:'var(--c-aux)', des:'#0ea5e9', eq:'var(--c-eq)', bld:'#e11d48', cvx:'#a16207', ind:'var(--c-ind)'};
+
+function linesTable(lines){
+  if (!lines.length) return '<div class="empty">긍장을 입력하세요</div>';
+  return '<table class="lt"><thead><tr><th>항목</th><th>수량</th><th>단위</th><th>단가(백만원)</th><th>금액(백만원)</th><th style="text-align:left">출처</th></tr></thead><tbody>' +
+    lines.map(function(l){
+      return '<tr><td><span class="dot" style="background:' + CATC[l.cat] + '"></span>' + esc(l.name) + '</td><td>' + fq(l.qty) + '</td><td>' + esc(l.unit) + '</td><td>' + fm(l.price) + '</td><td><b>' + fm(l.amt) + '</b></td><td class="src">' + esc(l.src) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderSegs(){
+  $('segs').innerHTML = S.segs.map(segCard).join('') || '<div class="card pad empty">구간이 없습니다. 아래에서 구간을 추가하세요.</div>';
+  $('segCnt').textContent = S.segs.length;
+  update();
+}
+function renderSeg(i){
+  var el = $('segs').querySelector('[data-i="' + i + '"]');
+  if (!el) return renderSegs();
+  var tmp = document.createElement('div'); tmp.innerHTML = segCard(S.segs[i], i);
+  el.replaceWith(tmp.firstChild);
+  update();
+}
+
+/* ───────────────────────── 렌더: 설비·비율·요약 ───────────────────────── */
+function renderEqPick(){
+  var h = '<option value="">설비 선택…</option>';
+  var groups = [['변압기', /^tr/], ['GIS · 개폐장치', /^gis/], ['조상설비 · 보호반', /^(shr|shc|pcm)/], ['토건 (345kV)', /^bld/], ['154kV 개폐소 · 변전소 패키지', /^(sw|ss)154/]];
+  groups.forEach(function(g){
+    h += '<optgroup label="' + g[0] + '">' + EQ.filter(function(e){ return g[1].test(e[0]); }).map(function(e){
+      return '<option value="' + e[0] + '">' + esc(e[1]) + ' — ' + fm(pr(e[0])) + '백만원/' + e[2] + '</option>';
+    }).join('') + '</optgroup>';
+  });
+  $('eqPick').innerHTML = h;
+}
+function renderEq(){
+  $('eqCnt').textContent = S.eq.length;
+  if (!S.eq.length) { $('eqTable').innerHTML = '<div class="empty">추가한 설비가 없습니다 — 연계 변전소 GIS Bay, 접속설비 개폐소 등을 추가하세요</div>'; return; }
+  $('eqTable').innerHTML = '<table class="eq"><thead><tr><th>설비</th><th>단가(백만원)</th><th>수량</th><th>금액(백만원)</th><th></th></tr></thead><tbody>' +
+    S.eq.map(function(e, i){
+      var p = P[e.id]; if (!p) return '';
+      return '<tr><td>' + esc(p.name) + '<span class="s">' + esc(p.src) + '</span></td><td>' + fm(pr(e.id)) + '<span class="s">/' + esc(p.qu) + '</span></td>' +
+        '<td><input type="number" min="0" step="1" data-eq="' + i + '" value="' + esc(e.q) + '"></td><td><b data-eqamt="' + i + '">' + fm(pr(e.id) * num(e.q)) + '</b></td>' +
+        '<td><button class="x" data-eqdel="' + i + '" title="삭제">✕</button></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+function renderRatios(){
+  var r = S.r;
+  $('ratios').innerHTML =
+    fld('설계·감리 자동 (고문 규칙)', pills('autoDes', [['1', '적용'], ['0', '미적용']], r.autoDes === '0' ? '0' : '1'), '한전 관로·전력구·터널: 케이블 설계 ' + fx(pr('pkg_design'), 1) + '%, 토목 설계 ' + fx(pr('pkg_design'), 1) + '% + 감리 ' + fx(pr('pkg_super'), 1) + '%', 'wide') +
+    fld('설계·감리 추가(수동)', ninput('design', r.design, '%', '0'), '직접비 × % (자동과 중복 주의)') +
+    fld('이윤·일반관리비', ninput('overhead', r.overhead, '%', '0'), '직접비 × %') +
+    fld('예비비', ninput('cont', r.cont, '%', '0'), '(직접비+위 2항) × %') +
+    fld('적용(착공)연도', ninput('year', r.year, '년', '2026', '1'), '기준연도 2026') +
+    fld('연 물가상승률', ninput('esc', r.esc, '%', '3', '0.1'), '<span id="efHint"></span>');
+}
+
+function update(){
+  var R = calcAll();
+  // 구간 카드 결과
+  R.segR.forEach(function(r, i){
+    var el = $('segs').querySelector('[data-i="' + i + '"]'); if (!el) return;
+    var s = S.segs[i];
+    el.querySelector('[data-r="tot"]').innerHTML = fe(r.total) + '<small>억원</small>';
+    el.querySelector('[data-r="pk"]').textContent = r.km > 0 ? 'km당 ' + fe(r.total / r.km) + '억원 · ' + fm(r.total) + '백만원' : '';
+    var seen = {};
+    el.querySelector('[data-r="warns"]').innerHTML = r.warns.filter(function(w){ if (seen[w.m]) return false; seen[w.m] = 1; return true; }).map(function(w){
+      var short = w.t === 'r' ? '참고 단가' : (/1km 미만/.test(w.m) ? '1km 미만 단가' : (/22\.9kV/.test(w.m) ? '이윤·관리비 불포함' : '확인 필요'));
+      return '<span class="tag ' + (w.t === 'r' ? 'ref' : 'w') + '" title="' + esc(w.m) + '">' + short + '</span>';
+    }).join('');
+    if (s.open) el.querySelector('[data-r="lines"]').innerHTML = linesTable(r.lines);
+    var tw = el.querySelector('[data-auto="tower"]');
+    if (tw) tw.value = r.km > 0 ? fx(Math.round(r.km * 1000 / (s.v === '154' ? 400 : 450)) + 1, 0) : '';
+    el.querySelectorAll('input[data-f="mh"],input[data-f="vent"]').forEach(function(inp){ inp.placeholder = '자동 ' + autoCnt(r.km); });
+    var cp = segCap(s), ce = el.querySelector('[data-r="cap"]'), pmw = num(S.plan.mw);
+    if (cp.mw == null) { ce.className = 'cap na'; ce.textContent = '용량 자료 없음'; }
+    else { var okc = cp.mw >= pmw; ce.className = 'cap ' + (okc ? 'ok' : 'ng'); ce.textContent = '송전 가능 ' + fx(cp.mw, 0) + 'MW ' + (okc ? '✓' : '< 발전 ' + fx(pmw, 0) + 'MW'); }
+    ce.title = cp.basis;
+  });
+  // 연계 용량 요약 (구간 중 가장 작은 용량 = 병목)
+  var pmw2 = num(S.plan.mw), neck = null;
+  S.segs.forEach(function(s, i){ var cp = segCap(s); if (cp.mw != null && (!neck || cp.mw < neck.mw)) neck = {mw:cp.mw, i:i}; });
+  var sp = $('sPlan');
+  if (!S.segs.length || !neck) { sp.className = 'plansum na'; sp.textContent = '발전용량 ' + fx(pmw2, 0) + 'MW · 구간 용량 정보 없음'; }
+  else if (neck.mw >= pmw2) { sp.className = 'plansum ok'; sp.innerHTML = '✓ 발전 <b>' + fx(pmw2, 0) + 'MW</b> 송전 가능 · 병목 구간 ' + (neck.i + 1) + ' (' + fx(neck.mw, 0) + 'MW, 여유 +' + fx((neck.mw / Math.max(pmw2, 0.001) - 1) * 100, 0) + '%)'; }
+  else { sp.className = 'plansum ng'; sp.innerHTML = '⚠ 구간 ' + (neck.i + 1) + ' 송전 가능 ' + fx(neck.mw, 0) + 'MW < 발전 <b>' + fx(pmw2, 0) + 'MW</b> — 회선·선종을 늘리세요'; }
+  // 설비 금액
+  document.querySelectorAll('[data-eqamt]').forEach(function(b){ var e = S.eq[+b.getAttribute('data-eqamt')]; if (e) b.textContent = fm(pr(e.id) * num(e.q)); });
+  // 요약
+  $('sTotal').textContent = fe(R.total);
+  $('sSub').innerHTML = '전기공사 ' + fe(R.elecDirect) + '억 + 토목·건축 ' + fe(R.civTotal) + '억' + (R.total - R.direct > 0.0005 ? ' + 간접·예비·물가 ' + fe(R.total - R.direct) + '억' : '') + ' · ' + fm(R.total) + '백만원';
+  $('sKm').innerHTML = fx(R.km, R.km % 1 ? 2 : 0) + '<small>km</small>';
+  $('sPerKm').innerHTML = (R.km > 0 ? fe(R.lineSum / R.km) : '–') + '<small>억원</small>';
+  var ind = R.design + R.over + R.cont + R.esc;
+  var parts = [['wire', R.cats.wire], ['civil', R.cats.civil], ['aux', R.cats.aux], ['des', R.cats.des], ['eq', R.cats.eq], ['bld', R.cats.bld], ['cvx', R.cats.cvx], ['ind', ind]];
+  var tot = R.total > 0 ? R.total : 1;
+  $('sBar').innerHTML = parts.filter(function(p){ return p[1] > 0; }).map(function(p){ return '<i style="width:' + (p[1] / tot * 100) + '%;background:' + CATC[p[0]] + '" title="' + CATN[p[0]] + '"></i>'; }).join('');
+  $('sLeg').innerHTML = parts.map(function(p){
+    return '<li><span class="dot" style="background:' + CATC[p[0]] + '"></span><span class="n">' + CATN[p[0]] + '</span><b class="num">' + fe(p[1]) + '억</b><em>' + (R.total > 0 ? fx(p[1] / R.total * 100, 0) + '%' : '') + '</em></li>';
+  }).join('');
+  $('sSegs').innerHTML = S.segs.map(function(s, i){
+    var r = R.segR[i];
+    return '<li><span class="dot" style="background:var(--c-wire)"></span><span class="n">' + (i + 1) + '. ' + esc(s.name || (s.v + 'kV ' + MLBL[s.m])) + ' <span class="m">' + fx(r.km, r.km % 1 ? 2 : 0) + 'km</span></span><b class="num">' + fe(r.total) + '억</b></li>';
+  }).join('') + (R.cats.eq > 0 ? '<li><span class="dot" style="background:var(--c-eq)"></span><span class="n">변전 · 접속설비 <span class="m">' + S.eq.length + '종</span></span><b class="num">' + fe(R.cats.eq) + '억</b></li>' : '') +
+    (R.civTotal > 0.0005 ? '<li><span class="dot" style="background:' + CATC.bld + '"></span><span class="n">토목 · 건축 <span class="m">변전소·개폐소</span></span><b class="num">' + fe(R.civTotal) + '억</b></li>' : '') +
+    (ind > 0.0005 ? '<li><span class="dot" style="background:var(--c-ind)"></span><span class="n">간접비·예비비·물가</span><b class="num">' + fe(ind) + '억</b></li>' : '');
+  renderCivSum(R);
+  var wmap = {};
+  R.segR.forEach(function(r, i){ r.warns.forEach(function(w){ (wmap[w.t + w.m] = wmap[w.t + w.m] || {t:w.t, m:w.m, s:[]}).s.push(i + 1); }); });
+  var ovn = Object.keys(OV).length;
+  $('sWarn').innerHTML = Object.keys(wmap).map(function(k){ var w = wmap[k]; return '<div class="' + (w.t === 'r' ? 'r' : 'w') + '">구간 ' + w.s.join('·') + ' — ' + esc(w.m) + '</div>'; }).join('') +
+    (ovn ? '<div class="w">단가표에서 수정한 단가 ' + ovn + '개가 적용 중입니다</div>' : '');
+  var eh = $('efHint'); if (eh) eh.textContent = R.yrs ? '보정계수 ×' + fx(R.ef, 3) + ' (' + (R.yrs > 0 ? '+' : '') + R.yrs + '년)' : '2026년 적용 시 보정 없음';
+  save();
+  LAST = R;
+}
+var LAST = null;
+
+/* ───────────────────────── 이벤트: 산출 ───────────────────────── */
+var NUMF = {km:1, n:1, rock:1, extra:1, shafts:1, depth:1, seaAdj:1};
+var OPTF = {mh:1, vent:1, water:1, dia:1, tvent:1, twater:1, slurry:1};
+function setField(s, f, v){
+  if (NUMF[f]) s[f] = (f === 'n' || f === 'rock') ? (parseInt(v, 10) || 0) : (v === '' ? '' : num(v));
+  else if (OPTF[f]) s[f] = v === '' ? '' : num(v);
+  else s[f] = v;
+}
+$('segs').addEventListener('click', function(ev){
+  var card = ev.target.closest('.segc'); if (!card) return;
+  var i = +card.getAttribute('data-i'), s = S.segs[i];
+  var b = ev.target.closest('.pills button');
+  if (b && !b.disabled) {
+    var f = b.parentNode.getAttribute('data-f'), v = b.getAttribute('data-val');
+    setField(s, f, v);
+    if (f === 'v' && s.v === '345' && s.m === 'oh') s.oh = '480x4B';
+    if (f === 'v' || f === 'm') { if (s.m === 'oh' && OHC[s.v]) s.oh = OHC[s.v].indexOf(s.oh) >= 0 ? s.oh : OHC[s.v][0]; }
+    normalize(s); renderSeg(i); return;
+  }
+  var a = ev.target.closest('[data-act]'); if (!a) return;
+  var act = a.getAttribute('data-act');
+  if (act === 'del') { if (S.segs.length > 0 && confirm((i + 1) + '번 구간을 삭제할까요?')) { S.segs.splice(i, 1); renderSegs(); } }
+  if (act === 'dup') { var c = JSON.parse(JSON.stringify(s)); c.id = ++uid; c.name = (s.name || '구간') + ' (복제)'; S.segs.splice(i + 1, 0, c); renderSegs(); toast('구간을 복제했습니다'); }
+  if (act === 'lines') { s.open = !s.open; renderSeg(i); }
+});
+$('segs').addEventListener('input', function(ev){
+  var t = ev.target, f = t.getAttribute('data-f'); if (!f || t.tagName === 'SELECT') return;
+  var card = t.closest('.segc'); var i = +card.getAttribute('data-i');
+  setField(S.segs[i], f, t.value);
+  if (f === 'name') { save(); updateSummaryOnly(); return; }
+  update();
+});
+$('segs').addEventListener('change', function(ev){
+  var t = ev.target; if (t.tagName !== 'SELECT') { if (t.getAttribute('data-f') === 'n') { var c0 = t.closest('.segc'); var i0 = +c0.getAttribute('data-i'); normalize(S.segs[i0]); renderSeg(i0); } return; }
+  var card = t.closest('.segc'), i = +card.getAttribute('data-i');
+  setField(S.segs[i], t.getAttribute('data-f'), t.value); normalize(S.segs[i]); renderSeg(i);
+});
+function updateSummaryOnly(){ update(); }
+
+$('btnAddSeg').addEventListener('click', function(){
+  var last = S.segs[S.segs.length - 1];
+  var s = newSeg(last ? last.v : '154', last ? last.m : 'duct', {km:1});
+  S.segs.push(s); renderSegs(); scrollToSeg(S.segs.length - 1);
+});
+var QUICK = [
+  ['154kV 가공 2회선', '154', 'oh', {n:2, km:5}],
+  ['154kV 관로 패키지 2회선', '154', 'pkg', {n:2, cond:'1200', km:5}],
+  ['154kV 관로 400㎟ 1회선', '154', 'pkg', {n:1, cond:'400', km:5}],
+  ['154kV 관로(한전 조건별)', '154', 'duct', {n:2, km:2}],
+  ['154kV 전력구', '154', 'box', {n:2, km:2}],
+  ['345kV 가공 2회선', '345', 'oh', {n:2, km:10}],
+  ['345kV 전력구', '345', 'box', {n:2, cond:'2500', km:3}],
+  ['345kV 해저 2회선', '345', 'sea', {km:20}],
+  ['154kV 해저', '154', 'sea', {n:2, km:10}],
+  ['22.9kV 지중 20MW', '22.9', 'ug22', {scale:'1', km:2}],
+  ['22.9kV 가공 20MW', '22.9', 'oh22', {scale:'1', km:3}]
+];
+$('quickAdd').innerHTML = '<span style="font-size:12.5px;color:var(--muted);align-self:center">빠른 추가</span>' + QUICK.map(function(q, i){ return '<button class="chip" data-q="' + i + '">+ ' + q[0] + '</button>'; }).join('');
+$('quickAdd').addEventListener('click', function(ev){
+  var b = ev.target.closest('[data-q]'); if (!b) return;
+  var q = QUICK[+b.getAttribute('data-q')], ex = JSON.parse(JSON.stringify(q[3])); ex.name = q[0];
+  S.segs.push(newSeg(q[1], q[2], ex)); renderSegs(); scrollToSeg(S.segs.length - 1);
+});
+function scrollToSeg(i){ var el = $('segs').querySelector('[data-i="' + i + '"]'); if (el) el.scrollIntoView({behavior:'smooth', block:'center'}); }
+$('btnFoldAll').addEventListener('click', function(){ var any = S.segs.some(function(s){ return s.open; }); S.segs.forEach(function(s){ s.open = !any; }); renderSegs(); this.textContent = any ? '내역 모두 펼치기' : '내역 모두 접기'; });
+
+$('btnEqAdd').addEventListener('click', function(){
+  var id = $('eqPick').value; if (!id) { toast('설비를 선택하세요'); return; }
+  var q = Math.max(0, num($('eqQty').value, 1));
+  var ex = S.eq.filter(function(e){ return e.id === id; })[0];
+  if (ex) ex.q = num(ex.q) + q; else S.eq.push({id:id, q:q});
+  renderEq(); update(); toast(P[id].name + ' 추가');
+});
+$('eqTable').addEventListener('input', function(ev){ var t = ev.target; if (!t.hasAttribute('data-eq')) return; S.eq[+t.getAttribute('data-eq')].q = t.value === '' ? 0 : num(t.value); update(); });
+$('eqTable').addEventListener('click', function(ev){ var b = ev.target.closest('[data-eqdel]'); if (!b) return; S.eq.splice(+b.getAttribute('data-eqdel'), 1); renderEq(); update(); });
+$('eqQuick').addEventListener('click', function(ev){
+  var b = ev.target.closest('[data-eqq]'); if (!b) return;
+  var id = b.getAttribute('data-eqq'), ex = S.eq.filter(function(e){ return e.id === id; })[0];
+  if (ex) ex.q = num(ex.q) + 1; else S.eq.push({id:id, q:1});
+  renderEq(); update(); toast(P[id].name + ' 추가');
+});
+$('ratios').addEventListener('click', function(ev){
+  var b = ev.target.closest('.pills button'); if (!b) return;
+  S.r[b.parentNode.getAttribute('data-f')] = b.getAttribute('data-val');
+  renderRatios(); update(); if ($('v-cmp').classList.contains('on')) renderCmp();
+});
+$('ratios').addEventListener('input', function(ev){ var f = ev.target.getAttribute('data-f'); if (!f) return; S.r[f] = ev.target.value === '' ? (f === 'year' ? 2026 : 0) : num(ev.target.value); update(); });
+$('projName').addEventListener('input', function(){ S.proj = this.value; save(); });
+
+$('btnReset').addEventListener('click', function(){
+  if (!confirm('입력한 구간·설비·비율을 지우고 예시 상태로 되돌릴까요? (수정한 단가는 유지)')) return;
+  S = defaultState(); boot(); toast('초기화했습니다');
+});
+
+/* ───────────────────────── 방식 비교 ───────────────────────── */
+var CV = [];
+function renderCmpCtl(){
+  var c = S.cmp;
+  $('cmpCtl').innerHTML =
+    fld('전압', pills('v', [['22.9','22.9kV'],['154','154kV'],['345','345kV']], c.v, 'big')) +
+    fld('긍장', ninput('km', c.km, 'km', null, '0.1')) +
+    fld('회선', ninput('n', c.n, '회선', null, '1'), c.v === '22.9' ? '1~8회선 (회선당 최대 ' + num(S.plan.max22, 20) + 'MW)' : '가공은 2·4회선, 해저 154kV는 1~3회선') +
+    (c.v !== '22.9' ? fld('지중 선종', pills('cond', [['2500','2,500㎟'],['2000','2,000㎟'],['1200','1,200㎟']], c.cond)) : '');
+}
+function renderCmp(){
+  var c = S.cmp, km = Math.max(0, num(c.km)), n = Math.max(1, c.n | 0);
+  CV = [];
+  function v(label, sub, seg, ref){ var r = calcSeg(seg); CV.push({label:label, sub:sub, seg:seg, total:r.total, ref:!!ref}); }
+  if (c.v === '22.9') {
+    var sc = String(Math.min(8, n));
+    v('가공', '산출서 ' + sc + '회선 (회선당 최대 ' + num(S.plan.max22, 20) + 'MW)', newSeg('22.9','oh22',{km:km, scale:sc}));
+    v('지중 · AL 630㎟', sc + '회선 + ELP 관로 + 맨홀', newSeg('22.9','ug22',{km:km, scale:sc, cu:'AL'}));
+    v('지중 · CU 600㎟', sc + '회선 + ELP 관로 + 맨홀', newSeg('22.9','ug22',{km:km, scale:sc, cu:'CU'}));
+    v('가공 · 한전 표준', '고압 3상 1회선, 변대·개폐기·감리 포함', newSeg('22.9','oh22',{km:km, scale:'std'}));
+    v('지중 · 한전 표준', 'AL 400㎟ 1회선, 기기·감리 포함', newSeg('22.9','ug22',{km:km, scale:'std'}));
+  } else {
+    var on = n <= 2 ? 2 : 4;
+    v('가공', on + '회선 ACSR ' + condLbl(OHC[c.v][0]) + (on !== n ? ' (회선 ' + on + ' 적용)' : ''), newSeg(c.v,'oh',{km:km, n:on}));
+    v('관로 · 한전 조건별', n + '회선 XLPE ' + comma(c.cond) + '㎟ · 일반도로·가시설 · 맨홀 자동' + (c.v === '345' ? ' · 154kV 관로 준용' : ''), newSeg(c.v,'duct',{km:km, n:n, cond:c.cond}));
+    v('지중 · 전력구', n + '회선 · 양측 2.1m · 일반도로·가시설 · 환기구 자동', newSeg(c.v,'box',{km:km, n:n, cond:c.cond}));
+    v('지중 · 터널', n + '회선 · 실드TBM · 수직구 2×30m · 오탁수 1조', newSeg(c.v,'tunnel',{km:km, n:n, cond:c.cond}));
+    if (c.v === '154') { var sn = Math.min(3, n); v('해저', 'XLPE 500㎟×3심 ' + sn + '회선' + (sn !== n ? ' (회선 ' + sn + ' 적용)' : '') + ' · 참고 단가', newSeg('154','sea',{km:km, n:sn}), true); }
+    else v('해저', 'XLPE 1,000㎟×3C 2회선' + (n !== 2 ? ' (회선 2 적용)' : '') + ' · 참고 단가', newSeg('345','sea',{km:km}), true);
+    if (c.v === '154') v('관로 · 고문 패키지', n + '회선 XLPE ' + comma(c.cond) + '㎟ · 케이블+토목+설계·감리 (확정 단가)', newSeg('154','pkg',{km:km, n:n, cond:c.cond}));
+  }
+  var max = 0, min = Infinity;
+  CV.forEach(function(x){ max = Math.max(max, x.total); if (!x.ref && x.total > 0) min = Math.min(min, x.total); });
+  $('cmpList').innerHTML = CV.map(function(x, i){
+    var w = max > 0 ? Math.max(2, x.total / max * 100) : 0;
+    var isMin = !x.ref && x.total === min;
+    return '<div class="cmp' + (isMin ? ' min' : '') + (x.ref ? ' ref' : '') + '"><div class="t"><b>' + esc(x.label) + (isMin ? ' <span class="tag v" style="background:#ecfdf5;color:#059669">최저</span>' : '') + (x.ref ? ' <span class="tag ref">참고</span>' : '') + '</b><span>' + esc(x.sub) + '</span></div>' +
+      '<div class="track"><div class="fill" style="width:' + w + '%"></div>' + (min < Infinity && x.total > 0 ? '<span class="fill-lbl">×' + fx(x.total / min, 1) + '</span>' : '') + '</div>' +
+      '<div class="v"><b class="num">' + fe(x.total) + '억원</b><span>km당 ' + (km > 0 ? fe(x.total / km) : '–') + '억원</span></div>' +
+      '<div class="a">' + (x.seg ? '<button class="btn sm" data-cadd="' + i + '">구간으로 추가</button>' : '') + '</div></div>';
+  }).join('');
+}
+$('cmpCtl').addEventListener('click', function(ev){
+  var b = ev.target.closest('.pills button'); if (!b) return;
+  var f = b.parentNode.getAttribute('data-f'); S.cmp[f] = b.getAttribute('data-val');
+  save(); renderCmpCtl(); renderCmp();
+});
+$('cmpCtl').addEventListener('input', function(ev){
+  var f = ev.target.getAttribute('data-f'); if (!f) return;
+  S.cmp[f] = f === 'n' ? (parseInt(ev.target.value, 10) || 1) : num(ev.target.value);
+  save(); renderCmp();
+});
+$('cmpList').addEventListener('click', function(ev){
+  var b = ev.target.closest('[data-cadd]'); if (!b) return;
+  var x = CV[+b.getAttribute('data-cadd')]; var s = JSON.parse(JSON.stringify(x.seg));
+  s.id = ++uid; s.name = x.label; S.segs.push(s); renderSegs(); toast('산출 탭에 "' + x.label + '" 구간을 추가했습니다');
+});
+
+/* ───────────────────────── 단가표 ───────────────────────── */
+function renderPrices(){
+  var q = $('ptQ').value.trim().toLowerCase();
+  var toks = q ? q.split(/\s+/) : [];
+  var h = '';
+  GROUPS.forEach(function(g){
+    var rows = Object.keys(P).map(function(k){ return P[k]; }).filter(function(p){
+      if (p.g !== g.id) return false;
+      if (!toks.length) return true;
+      var hay = (p.name + ' ' + p.unit + ' ' + p.src + ' ' + g.name).toLowerCase().replace(/,/g, '');
+      return toks.every(function(t){ return hay.indexOf(t.replace(/,/g, '')) >= 0; });
+    });
+    if (!rows.length) return;
+    h += '<div class="card pgrp"><h3>' + esc(g.name) + ' <span>' + esc(g.desc) + '</span></h3><table class="pt"><thead><tr><th>항목</th><th>단위</th><th>원본 단가</th><th>적용 단가</th><th class="src">출처</th></tr></thead><tbody>' +
+      rows.map(function(p){
+        var chg = OV[p.id] != null;
+        var extra = p.tower ? '<span style="display:block;font-size:11.5px;color:var(--faint)">철탑 1기 ' + fm(p.tower) + ' · 자재 ' + fm(p.mat) + ' · 도급 ' + fm(p.sub) + '</span>' : '';
+        return '<tr' + (chg ? ' class="chg"' : '') + '><td>' + esc(p.name) + (p.ref ? '<span class="refonly">참고</span>' : '') + extra + '</td><td>' + esc(p.unit) + '</td><td class="num">' + fm(p.v) + '</td>' +
+          '<td><input type="number" step="any" data-pid="' + p.id + '" value="' + (chg ? OV[p.id] : p.v) + '"></td><td class="src">' + esc(p.src) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  });
+  $('ptList').innerHTML = h || '<div class="card pad empty">검색 결과가 없습니다</div>';
+  var n = Object.keys(OV).length; $('ptChg').textContent = n ? '수정한 단가 ' + n + '개' : '';
+}
+$('ptQ').addEventListener('input', renderPrices);
+$('ptList').addEventListener('change', function(ev){
+  var t = ev.target, id = t.getAttribute('data-pid'); if (!id) return;
+  var v = parseFloat(t.value);
+  if (t.value === '' || !isFinite(v) || Math.abs(v - P[id].v) < 1e-9) delete OV[id]; else OV[id] = v;
+  try { localStorage.setItem(LS_OV, JSON.stringify(OV)); } catch (e) {}
+  var tr = t.closest('tr'); tr.classList.toggle('chg', OV[id] != null);
+  if (OV[id] == null) t.value = P[id].v;
+  var n = Object.keys(OV).length; $('ptChg').textContent = n ? '수정한 단가 ' + n + '개' : '';
+  renderEqPick(); renderEq(); renderCivPick(); renderCiv(); renderCivx(); update(); renderCmp();
+  toast(OV[id] != null ? '단가를 바꿨습니다 — 산출에 반영' : '원본 단가로 되돌렸습니다');
+});
+$('btnPtReset').addEventListener('click', function(){
+  if (!Object.keys(OV).length) { toast('수정한 단가가 없습니다'); return; }
+  if (!confirm('수정한 단가를 모두 원본으로 되돌릴까요?')) return;
+  OV = {}; try { localStorage.removeItem(LS_OV); } catch (e) {}
+  renderPrices(); renderEqPick(); renderEq(); renderCivPick(); renderCiv(); renderCivx(); update(); renderCmp(); toast('원본 단가로 복원했습니다');
+});
+
+/* ───────────────────────── 탭 ───────────────────────── */
+document.querySelector('.stabs').addEventListener('click', function(ev){
+  var b = ev.target.closest('.stab'); if (!b) return;
+  if (document.querySelector('.mtab[data-mt="civ"]').classList.contains('on')) setMain('elec');
+  document.querySelectorAll('.stab').forEach(function(x){ x.classList.toggle('on', x === b); });
+  var v = b.getAttribute('data-view');
+  document.querySelectorAll('.view').forEach(function(x){ x.classList.toggle('on', x.id === 'v-' + v); });
+  if (v === 'cmp') { renderCmpCtl(); renderCmp(); }
+  if (v === 'prices') renderPrices();
+  try { history.replaceState(null, '', '#' + v); } catch (e) {}
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+
+/* ───────────────────────── 내보내기 ───────────────────────── */
+function today(){ var d = new Date(); return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
+function allRows(R){
+  var rows = [];
+  R.segR.forEach(function(r, i){
+    var s = S.segs[i], nm = (i + 1) + '. ' + (s.name || '') + ' [' + s.v + 'kV ' + MLBL[s.m] + ' ' + fx(r.km, 2) + 'km]';
+    r.lines.forEach(function(l){ rows.push([nm, CATN[l.cat], l.name, l.qty, l.unit, l.price, l.amt, l.src]); });
+  });
+  R.eqL.forEach(function(l){ rows.push(['변전·접속설비', CATN.eq, l.name, l.qty, l.unit, l.price, l.amt, l.src]); });
+  R.civL.forEach(function(l){ rows.push(['토목·건축 (변전소·개폐소)', CATN[l.cat], l.name, l.qty, l.unit, l.price, l.amt, l.src]); });
+  return rows;
+}
+function exportCsv(){
+  var R = calcAll();
+  var head = ['구간', '분류', '항목', '수량', '단위', '단가(백만원)', '금액(백만원)', '출처'];
+  var rows = allRows(R).map(function(r){ return [r[0], r[1], r[2], +r[3].toFixed(4), r[4], +r[5].toFixed(4), +r[6].toFixed(3), r[7]]; });
+  rows.push([]);
+  rows.push(['합계', '', '전기공사 직접비', '', '', '', +R.elecDirect.toFixed(3), '']);
+  rows.push(['', '', '토목·건축 직접비', '', '', '', +R.civTotal.toFixed(3), '']);
+  rows.push(['', '', '직접비 합계', '', '', '', +R.direct.toFixed(3), '']);
+  if (R.design) rows.push(['', '', '설계·감리 추가 ' + S.r.design + '%', '', '', '', +R.design.toFixed(3), '']);
+  if (R.over) rows.push(['', '', '이윤·일반관리비 ' + S.r.overhead + '%', '', '', '', +R.over.toFixed(3), '']);
+  if (R.cont) rows.push(['', '', '예비비 ' + S.r.cont + '%', '', '', '', +R.cont.toFixed(3), '']);
+  if (R.esc) rows.push(['', '', '물가 보정 ' + S.r.esc + '%/년 × ' + R.yrs + '년', '', '', '', +R.esc.toFixed(3), '']);
+  rows.push(['', '', '총 공사비', '', '', '', +R.total.toFixed(3), '= ' + fe(R.total) + '억원']);
+  var csv = [['사업명', S.proj || ''], ['산출일', new Date().toLocaleDateString('ko-KR')], ['단가 기준', '한전 2026 건설분야 예산 기준단가 외 (개략)'], [], head].concat(rows).map(function(r){
+    return r.map(function(c){ c = c == null ? '' : String(c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(',');
+  }).join('\r\n');
+  var blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '공사비산출_전기_토목건축_' + today() + '.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast('CSV를 저장했습니다');
+}
+function buildReport(){
+  var R = calcAll();
+  var h = '<h1>공사비 개략 산출 내역서 (전기 · 토목·건축)</h1><div class="m">사업명: <b>' + esc(S.proj || '-') + '</b> · 산출일 ' + new Date().toLocaleDateString('ko-KR') + ' · 단가: 한전 2026 건설분야 예산 기준단가 외 · 단위 백만원</div>';
+  h += '<table><thead><tr><th>구분</th><th>금액(백만원)</th><th>억원</th><th>비율</th></tr></thead><tbody>';
+  [['선로·케이블', R.cats.wire], ['토목(관로·전력구·터널)', R.cats.civil], ['부대설비', R.cats.aux], ['설계·감리(자동·패키지)', R.cats.des], ['변전·접속설비', R.cats.eq], ['건축(변전소·개폐소)', R.cats.bld], ['추가 토목·울타리', R.cats.cvx], ['설계·감리 추가(수동)', R.design], ['이윤·일반관리비', R.over], ['예비비', R.cont], ['물가 보정', R.esc]].forEach(function(x){
+    if (x[1]) h += '<tr><td>' + x[0] + '</td><td>' + fm(x[1]) + '</td><td>' + fe(x[1]) + '</td><td>' + fx(x[1] / (R.total || 1) * 100, 1) + '%</td></tr>';
+  });
+  h += '<tr><td><b>총 공사비</b></td><td><b>' + fm(R.total) + '</b></td><td><b>' + fe(R.total) + '</b></td><td>100%</td></tr></tbody></table>';
+  h += '<table><thead><tr><th>구간 / 항목</th><th>수량</th><th>단위</th><th>단가</th><th>금액</th><th>출처</th></tr></thead><tbody>';
+  R.segR.forEach(function(r, i){
+    var s = S.segs[i];
+    h += '<tr><td class="l" colspan="4"><b>' + (i + 1) + '. ' + esc(s.name || '') + ' — ' + s.v + 'kV ' + MLBL[s.m] + ', ' + fx(r.km, 2) + 'km</b></td><td><b>' + fm(r.total) + '</b></td><td></td></tr>';
+    r.lines.forEach(function(l){ h += '<tr><td class="l">&nbsp;&nbsp;' + esc(l.name) + '</td><td>' + fq(l.qty) + '</td><td>' + esc(l.unit) + '</td><td>' + fm(l.price) + '</td><td>' + fm(l.amt) + '</td><td class="l m">' + esc(l.src) + '</td></tr>'; });
+  });
+  if (R.eqL.length) {
+    h += '<tr><td class="l" colspan="4"><b>변전·접속설비</b></td><td><b>' + fm(R.cats.eq) + '</b></td><td></td></tr>';
+    R.eqL.forEach(function(l){ h += '<tr><td class="l">&nbsp;&nbsp;' + esc(l.name) + '</td><td>' + fq(l.qty) + '</td><td>' + esc(l.unit) + '</td><td>' + fm(l.price) + '</td><td>' + fm(l.amt) + '</td><td class="l m">' + esc(l.src) + '</td></tr>'; });
+  }
+  if (R.civL.length) {
+    h += '<tr><td class="l" colspan="4"><b>토목·건축 (변전소·개폐소)</b></td><td><b>' + fm(R.civTotal) + '</b></td><td></td></tr>';
+    R.civL.forEach(function(l){ h += '<tr><td class="l">&nbsp;&nbsp;' + esc(l.name) + '</td><td>' + fq(l.qty) + '</td><td>' + esc(l.unit) + '</td><td>' + fm(l.price) + '</td><td>' + fm(l.amt) + '</td><td class="l m">' + esc(l.src) + '</td></tr>'; });
+  }
+  h += '</tbody></table><div class="m">※ 개략(예산) 수준. 이윤·일반관리비 불포함(별도 비율 입력 시 반영). 해저는 2019~2023 참고 단가. 실제 사업은 상세설계 필요.</div>';
+  $('report').innerHTML = h;
+}
+['btnCsv', 'btnCsv2'].forEach(function(id){ $(id).addEventListener('click', exportCsv); });
+['btnPrint', 'btnPrint2'].forEach(function(id){ $(id).addEventListener('click', function(){ buildReport(); window.print(); }); });
+window.addEventListener('beforeprint', buildReport);
+
+/* ───────────────────────── 연계 구성 화면 ───────────────────────── */
+var ARR = '<div class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
+function renderPlanIn(){
+  var p = S.plan, u = num(p.util, 80) / 100;
+  var so = [['auto', '자동 추천 (용량 만족 · 최소 회선)']];
+  condsOf(p.m154).forEach(function(cd){ nsOf(p.m154).forEach(function(n){ var c = capMVA('154', p.m154, cd, n); if (c) so.push([cd + '|' + n, condName(p.m154, cd) + ' · ' + n + '회선 · ' + fx(n * c.mva * u * PF, 0) + 'MW']); }); });
+  if (!so.some(function(o){ return o[0] === p.sel154; })) p.sel154 = 'auto';
+  $('planIn').innerHTML =
+    fld('발전용량', ninput('mw', p.mw, 'MW', null, '1'), '설비용량 (태양광·풍력·ESS 합)', 'hero') +
+    fld('22.9kV 회선당 최대', ninput('max22', p.max22, 'MW', '20', '1'), '1회선에 실을 최대 용량') +
+    fld('변압기 1대 용량', ninput('tr', p.tr, 'MW', '100', '10'), '사내 태양광 실적 사례 기준 100MW') +
+    fld('154kV 회선당 이용률', ninput('util', p.util, '%', '80', '1'), '× 역률 0.95 → MW') +
+    '<div class="grp"><i style="background:#f59e0b"></i>22.9kV 선로 — 발전단지 → 승압변전소</div>' +
+    fld('방식', pills('m22', [['ug22', '지중 관로'], ['oh22', '가공']], p.m22)) +
+    (p.m22 === 'ug22' ? fld('도체', pills('cu', [['AL', 'AL 630㎟'], ['CU', 'CU 600㎟']], p.cu), '', 'wide') : '') +
+    fld('긍장', ninput('km22', p.km22, 'km', null, '0.1')) +
+    '<div class="grp"><i style="background:#2563eb"></i>154kV 선로 — 승압변전소 → 한전 변전소</div>' +
+    fld('방식', pills('m154', M154.map(function(m){ return [m, MLBL[m]]; }), p.m154), '', 'full') +
+    fld('선종 · 회선', sel('sel154', so, p.sel154), '용량만 맞으면 1회선도 선택 (가공 단가는 2·4회선만 있음)', 'wide') +
+    fld('긍장', ninput('km154', p.km154, 'km', null, '0.1'));
+}
+function renderPlanOut(){
+  var p = S.plan, R = planCalc(p), s = R.sel;
+  var pct = function(cap){ return R.mw > 0 ? (cap >= R.mw ? '여유 +' : '부족 ') + fx((cap / R.mw - 1) * 100, 0) + '%' : ''; };
+  var cls = function(cap){ return cap >= R.mw ? 'okc' : 'ngc'; };
+  var h = '<div class="flow">' +
+    '<div class="node gen"><span class="t">발전단지</span><b class="num">' + fx(R.mw, R.mw % 1 ? 1 : 0) + 'MW</b><span class="s">설비용량</span></div>' + ARR +
+    '<div class="lk l22"><span class="t">22.9kV · ' + (p.m22 === 'ug22' ? '지중 관로 ' + (p.cu === 'CU' ? 'CU 600㎟' : 'AL 630㎟') : '가공') + '</span><b class="num">' + R.n22 + '회선</b>' +
+      '<span class="s">회선당 ' + fx(R.max22, 0) + 'MW × ' + R.n22 + ' = <span class="' + cls(R.cap22) + '">' + fx(R.cap22, 0) + 'MW</span><br>긍장 ' + fx(num(p.km22), 2) + 'km</span></div>' + ARR +
+    '<div class="node ss"><span class="t">승압변전소 154/22.9kV</span><b class="num">' + fx(R.tr, 0) + 'MW × ' + R.k + '대</b><span class="s">변압기 합계 <span class="' + cls(R.trCap) + '">' + fx(R.trCap, 0) + 'MW</span></span></div>' + ARR +
+    '<div class="lk l154"><span class="t">154kV · ' + MLBL[p.m154] + (p.sel154 === 'auto' ? ' · 자동' : '') + '</span>' +
+      (s ? '<b class="num">' + s.n + '회선</b><span class="s">' + condName(p.m154, s.cond) + '<br><span class="' + cls(s.cap) + '">' + fx(s.cap, 0) + 'MW (' + pct(s.cap) + ')</span> · 긍장 ' + fx(num(p.km154), 2) + 'km</span>'
+         : '<b class="ngc">구성 불가</b><span class="s">다른 방식을 고르세요</span>') + '</div>' + ARR +
+    '<div class="node kp"><span class="t">한전 변전소</span><b class="num">154kV ' + (s ? s.n : 0) + 'Bay</b><span class="s">접속 GIS · 보호반</span></div>' +
+  '</div>';
+  if (R.warns.length) h += '<div class="wlist">' + R.warns.map(function(w){ return '<div class="w">' + esc(w) + '</div>'; }).join('') + '</div>';
+  // 154kV 대안표
+  var rows = R.alts.map(function(a){
+    var cur = s && a.m === p.m154 && a.cond === s.cond && a.n === s.n;
+    return '<tr' + (a.n ? ' data-pick="' + a.m + '|' + a.cond + '|' + a.n + '"' : '') + (cur ? ' class="cur"' : '') + '><td>' + MLBL[a.m] + '</td><td>' + condName(a.m, a.cond) + '</td>' +
+      '<td>' + (a.n ? a.n + '회선' : '<span class="ngc">' + (a.m === 'pkg' && CAPD.ns154[a.cond] ? 2 : nsOf(a.m).slice(-1)[0]) + '회선으로도 부족</span>') + '</td><td class="num">' + fx(a.cap, 0) + 'MW</td><td class="' + cls(a.cap) + '">' + pct(a.cap) + '</td></tr>';
+  }).join('');
+  h += '<details class="alts"' + (S.plan._open ? ' open' : '') + '><summary>154kV 선종·방식별 필요 회선 비교 (행을 누르면 선택)</summary>' +
+    '<table class="alt"><thead><tr><th>방식</th><th>선종</th><th>필요 회선</th><th>송전 가능</th><th>여유</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<p class="note" style="margin:8px 0 10px">송전 가능 = 회선수 × 회선당 MVA(관로·전력구는 회선수가 늘면 회선당 허용전류 감소) × 이용률 ' + fx(num(p.util, 80), 0) + '% × 역률 0.95. 출처: 송전선로_선종별_용량현황, 표준외 154kV 지중 용량현황, 신안 해저 사례.</p></details>';
+  h += '<div class="plan-act"><p class="note"><b>구성 요약</b> — ' + fx(R.mw, 0) + 'MW → 22.9kV ' + R.n22 + '회선(' + fx(num(p.km22), 2) + 'km) → 변압기 ' + fx(R.tr, 0) + 'MW×' + R.k + '대 → 154kV ' +
+    (s ? condName(p.m154, s.cond) + ' ' + s.n + '회선(' + fx(num(p.km154), 2) + 'km)' : '구성 불가') + ' → 한전 변전소. 버튼을 누르면 아래 공사비 구간·설비가 이 구성으로 바뀝니다.</p>' +
+    '<button class="btn pri" data-act="apply"' + (s ? '' : ' disabled') + '>이 구성으로 공사비 구간 만들기</button></div>';
+  $('planOut').innerHTML = h;
+}
+$('planIn').addEventListener('click', function(ev){
+  var b = ev.target.closest('.pills button'); if (!b || b.disabled) return;
+  var f = b.parentNode.getAttribute('data-f'); S.plan[f] = b.getAttribute('data-val');
+  if (f === 'm154') S.plan.sel154 = 'auto';
+  renderPlanIn(); renderPlanOut(); update();
+});
+$('planIn').addEventListener('input', function(ev){
+  var t = ev.target, f = t.getAttribute('data-f'); if (!f || t.tagName === 'SELECT') return;
+  S.plan[f] = t.value === '' ? '' : num(t.value);
+  renderPlanOut(); update();
+});
+$('planIn').addEventListener('change', function(ev){
+  var t = ev.target, f = t.getAttribute('data-f'); if (!f) return;
+  if (t.tagName === 'SELECT') { S.plan[f] = t.value; renderPlanOut(); update(); return; }
+  if (f === 'util' || f === 'max22') { renderPlanIn(); renderSegs(); if ($('v-cmp').classList.contains('on')) { renderCmpCtl(); renderCmp(); } }
+});
+$('planOut').addEventListener('toggle', function(ev){ if (ev.target.tagName === 'DETAILS') S.plan._open = ev.target.open; }, true);
+$('planOut').addEventListener('click', function(ev){
+  var tr = ev.target.closest('tr[data-pick]');
+  if (tr) { var a = tr.getAttribute('data-pick').split('|'); S.plan.m154 = a[0]; S.plan.sel154 = a[1] + '|' + a[2]; S.plan._open = true; renderPlanIn(); renderPlanOut(); update(); return; }
+  var b = ev.target.closest('[data-act="apply"]'); if (!b) return;
+  if (S.segs.length && !confirm('아래 공사비 구간과 변전·접속설비를 이 연계 구성으로 바꿀까요? (지금 입력한 구간은 지워집니다)')) return;
+  var built = planBuild(S.plan);
+  S.segs = built.segs; S.eq = built.eq;
+  S.civ = (S.civ || []).filter(function(e){ return e.id !== 'bld_ss'; }).concat(built.civ);
+  renderEq(); renderSegs(); renderCiv(); update();
+  toast('연계 구성으로 구간 ' + built.segs.length + '개 · 설비 ' + built.eq.length + '종 · 변전소 건축(토목·건축 탭)을 만들었습니다');
+  $('segs').scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+/* ───────────────────────── 토목·건축 탭 ───────────────────────── */
+function renderCivPick(){
+  var h = '<option value="">건축 항목 선택…</option>';
+  [['확정', /^bld_(ss|sw_)/], ['참고 — 고문 산출표 · 한전 토건(㎡)', /^(bld_ref|kb154)/]].forEach(function(g){
+    h += '<optgroup label="' + g[0] + '">' + CIV.filter(function(c){ return g[1].test(c[0]); }).map(function(c){
+      return '<option value="' + c[0] + '">' + esc(c[1]) + ' — ' + fm(pr(c[0])) + '백만원/' + c[2] + '</option>';
+    }).join('') + '</optgroup>';
+  });
+  $('civPick').innerHTML = h;
+}
+function renderCiv(){
+  $('civCnt').textContent = S.civ.length;
+  if (!S.civ.length) { $('civTable').innerHTML = '<div class="empty">추가한 건축 항목이 없습니다 — 발전사업자 변전소 건축(30억)을 추가하세요</div>'; return; }
+  $('civTable').innerHTML = '<table class="eq"><thead><tr><th>항목</th><th>단가(백만원)</th><th>수량</th><th>금액(백만원)</th><th></th></tr></thead><tbody>' +
+    S.civ.map(function(e, i){
+      var p = P[e.id]; if (!p) return '';
+      return '<tr><td>' + esc(p.name) + (p.dr === 'bld' ? ' <span class="tag w">설계·감리 자동 대상</span>' : '') + '<span class="s">' + esc(p.src) + '</span></td><td>' + fm(pr(e.id)) + '<span class="s">/' + esc(p.qu) + '</span></td>' +
+        '<td><input type="number" min="0" step="' + (p.qu === '㎡' ? '10' : '1') + '" data-civ="' + i + '" value="' + esc(e.q) + '"></td><td><b data-civamt="' + i + '">' + fm(pr(e.id) * num(e.q)) + '</b></td>' +
+        '<td><button class="x" data-civdel="' + i + '" title="삭제">✕</button></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+function renderCivx(){
+  $('civxTable').innerHTML = '<table class="eq"><thead><tr><th>항목</th><th>단가(백만원)</th><th>수량</th><th>금액(백만원)</th></tr></thead><tbody>' +
+    CIV.filter(function(c){ return c[5] === 'cvx'; }).map(function(c){
+      var q = S.civx[c[0]] || '';
+      return '<tr><td>' + esc(c[1]) + '<span class="s">' + esc(c[4]) + '</span></td><td>' + fx(pr(c[0]), 3) + '<span class="s">/' + c[2] + '</span></td>' +
+        '<td><input type="number" min="0" step="any" data-civx="' + c[0] + '" value="' + esc(q) + '" placeholder="0"></td><td><b data-civxamt="' + c[0] + '">' + (q ? fm(pr(c[0]) * num(q)) : '–') + '</b></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+function renderCivSum(R){
+  if (!$('cTotal')) return;
+  $('cTotal').textContent = fe(R.total);
+  $('cElec').innerHTML = fe(R.elecDirect) + '<small>억원</small>';
+  $('cCiv').innerHTML = fe(R.civTotal) + '<small>억원</small>';
+  $('cSub').textContent = (R.total - R.direct > 0.0005 ? '간접·예비·물가 ' + fe(R.total - R.direct) + '억 포함 · ' : '') + fm(R.total) + '백만원';
+  $('cLines').innerHTML = R.civL.length ? R.civL.map(function(l){
+    return '<li><span class="dot" style="background:' + CATC[l.cat] + '"></span><span class="n">' + esc(l.name) + ' <span class="m">' + fq(l.qty) + ' ' + esc(l.unit) + '</span></span><b class="num">' + fe(l.amt) + '억</b></li>';
+  }).join('') : '<li><span class="n" style="color:var(--faint)">항목 없음</span></li>';
+  document.querySelectorAll('[data-civamt]').forEach(function(b){ var e = S.civ[+b.getAttribute('data-civamt')]; if (e) b.textContent = fm(pr(e.id) * num(e.q)); });
+  document.querySelectorAll('[data-civxamt]').forEach(function(b){ var id = b.getAttribute('data-civxamt'), q = S.civx[id]; b.textContent = q ? fm(pr(id) * num(q)) : '–'; });
+}
+function civAdd(id, q){
+  var ex = S.civ.filter(function(e){ return e.id === id; })[0];
+  if (ex) ex.q = num(ex.q) + q; else S.civ.push({id:id, q:q});
+  renderCiv(); update(); toast(P[id].name.split(' — ')[0] + ' 추가');
+}
+$('btnCivAdd').addEventListener('click', function(){ var id = $('civPick').value; if (!id) { toast('항목을 선택하세요'); return; } civAdd(id, Math.max(0, num($('civQty').value, 1))); });
+$('civQuick').addEventListener('click', function(ev){ var b = ev.target.closest('[data-cq]'); if (b) civAdd(b.getAttribute('data-cq'), 1); });
+$('civTable').addEventListener('input', function(ev){ var t = ev.target; if (!t.hasAttribute('data-civ')) return; S.civ[+t.getAttribute('data-civ')].q = t.value === '' ? 0 : num(t.value); update(); });
+$('civTable').addEventListener('click', function(ev){ var b = ev.target.closest('[data-civdel]'); if (!b) return; S.civ.splice(+b.getAttribute('data-civdel'), 1); renderCiv(); update(); });
+$('civxTable').addEventListener('input', function(ev){ var t = ev.target, id = t.getAttribute('data-civx'); if (!id) return; if (t.value === '' || !(num(t.value) > 0)) delete S.civx[id]; else S.civx[id] = num(t.value); update(); });
+['btnCsv3'].forEach(function(id){ $(id).addEventListener('click', function(){ exportCsv(); }); });
+['btnPrint3'].forEach(function(id){ $(id).addEventListener('click', function(){ buildReport(); window.print(); }); });
+
+var HERO = {
+  elec:['전기공사비 산출', '22.9kV · 154kV · 345kV &nbsp;|&nbsp; 가공 · 지중(관로·전력구·터널) · 해저 · 변전·접속설비 &nbsp;|&nbsp; 금액 단위 백만원 (요약은 억원)'],
+  civ:['토목 · 건축 공사비 산출', '154kV 발전사업자 변전소 · 개폐소 건축 &nbsp;|&nbsp; 부지 여건 추가 토목 · 울타리 (한전 2026) &nbsp;|&nbsp; 전기공사와 합산']
+};
+function setMain(mt){
+  document.querySelectorAll('.mtab[data-mt]').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-mt') === mt); });
+  document.querySelector('.hero h1').textContent = HERO[mt][0];
+  document.querySelector('.hero p').innerHTML = HERO[mt][1];
+  if (mt === 'civ') {
+    document.querySelectorAll('.stab').forEach(function(x){ x.classList.remove('on'); });
+    document.querySelectorAll('.view').forEach(function(x){ x.classList.toggle('on', x.id === 'v-civ'); });
+    renderCivPick(); renderCiv(); renderCivx(); update();
+    try { history.replaceState(null, '', '#civ'); } catch (e) {}
+  }
+}
+document.querySelector('.mtabs').addEventListener('click', function(ev){
+  var b = ev.target.closest('.mtab[data-mt]'); if (!b) return;
+  if (b.getAttribute('data-mt') === 'civ') setMain('civ');
+  else { setMain('elec'); document.querySelector('.stab[data-view="calc"]').click(); }
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+
+/* ───────────────────────── 시작 ───────────────────────── */
+function boot(){
+  $('projName').value = S.proj || '';
+  renderPlanIn(); renderPlanOut();
+  renderEqPick(); renderEq(); renderRatios(); renderCivPick(); renderCiv(); renderCivx(); renderSegs();
+  var h = (location.hash || '').slice(1);
+  if (h === 'civ') setMain('civ');
+  if (['cmp', 'prices', 'notes'].indexOf(h) >= 0) { var b = document.querySelector('.stab[data-view="' + h + '"]'); if (b) b.click(); }
+}
+boot();
+window.__cost = {P:P, S:function(){ return S; }, calcSeg:calcSeg, calcAll:calcAll, pr:pr};
+})();
+</script>
+</body>
+</html>
